@@ -63,7 +63,7 @@ export function renderComplexityWebview(
       ].join('')
     )
     .replaceAll('{{PROVIDE_TOTAL}}', String(provideTotal))
-    .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provides', 'provides', detailPayload.provides.items))
+    .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provided', 'provides', detailPayload.provides.items))
     .replaceAll('{{ANALYSIS_DETAILS}}', serializeForScript(detailPayload));
 }
 
