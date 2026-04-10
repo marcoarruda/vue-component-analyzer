@@ -38,6 +38,21 @@ Run `Vue Analyzer: Show Complexity` from the editor title action.
 
 Browse analyzed `.vue` files in the `Vue Analyzer` activity bar view.
 
+The `Vue Components` tree can be shown in two modes:
+
+- `List`: flat list across the workspace
+- `Folders`: default mode, mirrors the workspace directory structure, and opens folders expanded
+
+When `List` mode is active, you can sort the sidebar by:
+
+- path
+- inputs
+- reactivity
+- outputs
+- injected dependencies
+- provided dependencies
+- stores
+
 ![Vue Analyzer tree view](media/docs-002.png)
 
 ### 3. Drill into exact details

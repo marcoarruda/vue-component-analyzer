@@ -78,6 +78,8 @@ export interface BadgeGroups {
   outputs: boolean;
 }
 
+export type AnalysisMetricName = 'inputs' | 'reactivity' | 'outputs' | 'injects' | 'provides' | 'stores';
+
 export type BadgeGroupName = keyof BadgeGroups;
 
 const BRAILLE_BASE = 0x2800;
@@ -134,4 +136,21 @@ export function getBadgeCombinationLabel(groups: BadgeGroups) {
 
 export function getActiveBadgeGroups(groups: BadgeGroups) {
   return (Object.keys(groups) as BadgeGroupName[]).filter((group) => groups[group]);
+}
+
+export function getAnalysisMetricValue(analysis: ComponentAnalysisResult, metric: AnalysisMetricName) {
+  switch (metric) {
+    case 'inputs':
+      return analysis.external.props.length + analysis.external.models.length + analysis.external.slots.length;
+    case 'reactivity':
+      return analysis.internal.refs.length + analysis.internal.computed.length + analysis.internal.watchers.length;
+    case 'outputs':
+      return analysis.external.emits.length + analysis.external.exposed.length + analysis.external.slotProps.length;
+    case 'injects':
+      return analysis.external.injects.length;
+    case 'provides':
+      return analysis.external.provides.length;
+    case 'stores':
+      return analysis.external.stores.length;
+  }
 }

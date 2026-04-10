@@ -19,6 +19,26 @@
   "contributes": {
     "commands": [
       {
+        "command": "vueComponentAnalyzer.toggleTreeDisplayMode",
+        "title": "Vue Analyzer: Toggle Component View Mode",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "vueComponentAnalyzer.switchToFolderTreeDisplayMode",
+        "title": "Vue Analyzer: Switch Component View To Folders",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "vueComponentAnalyzer.switchToListTreeDisplayMode",
+        "title": "Vue Analyzer: Switch Component View To List",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "vueComponentAnalyzer.setListSortMode",
+        "title": "Vue Analyzer: Set Component List Sort",
+        "icon": "$(sort-precedence)"
+      },
+      {
         "command": "vueComponentAnalyzer.showComplexity",
         "title": "Vue Analyzer: Show Complexity",
         "icon": {
@@ -303,7 +323,41 @@
           "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores-injects-outputs'",
           "group": "navigation"
         }
+      ],
+      "view/title": [
+        {
+          "command": "vueComponentAnalyzer.switchToFolderTreeDisplayMode",
+          "when": "view == vueComponentAnalyzer.components && vueComponentAnalyzer.componentsViewMode == list",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vueComponentAnalyzer.switchToListTreeDisplayMode",
+          "when": "view == vueComponentAnalyzer.components && vueComponentAnalyzer.componentsViewMode == folders",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vueComponentAnalyzer.setListSortMode",
+          "when": "view == vueComponentAnalyzer.components && config.vueComponentAnalyzer.components.viewMode == list",
+          "group": "navigation@2"
+        }
       ]
+    },
+    "configuration": {
+      "title": "Vue Component Analyzer",
+      "properties": {
+        "vueComponentAnalyzer.components.viewMode": {
+          "type": "string",
+          "enum": ["list", "folders"],
+          "default": "folders",
+          "description": "Choose whether the Vue Components view is shown as one flat list or grouped by directory structure."
+        },
+        "vueComponentAnalyzer.components.listSortBy": {
+          "type": "string",
+          "enum": ["path", "inputs", "reactivity", "outputs", "injects", "provides", "stores"],
+          "default": "path",
+          "description": "Choose how the flat Vue Components list is sorted. Metric sorts show the highest counts first."
+        }
+      }
     },
     "viewsContainers": {
       "activitybar": [
