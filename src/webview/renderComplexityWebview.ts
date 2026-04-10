@@ -1,20 +1,34 @@
 import * as vscode from 'vscode';
 
-import type { ComponentAnalysisResult } from '../types/analysis';
+import {
+  getBadgeAssetName,
+  getBadgeCombinationLabel,
+  getBadgeGroups,
+  type ComponentAnalysisResult
+} from '../types/analysis';
 
-export function renderComplexityWebview(webview: vscode.Webview, analysis: ComponentAnalysisResult) {
+export function renderComplexityWebview(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  analysis: ComponentAnalysisResult
+) {
   const inputTotal = analysis.external.props.length + analysis.external.models.length + analysis.external.slots.length;
   const injectTotal = analysis.external.injects.length;
   const storeTotal = analysis.external.stores.length;
   const provideTotal = analysis.external.provides.length;
   const outputTotal = analysis.external.emits.length + analysis.external.exposed.length + analysis.external.slotProps.length;
+  const badgeGroups = getBadgeGroups(analysis);
+  const badgeLabel = getBadgeCombinationLabel(badgeGroups);
+  const badgeAssetUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'media', 'file-badges', getBadgeAssetName(badgeGroups))
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline';" />
     <title>Vue Component Complexity</title>
     <style>
       :root {
@@ -67,8 +81,47 @@ export function renderComplexityWebview(webview: vscode.Webview, analysis: Compo
 
       .header {
         display: grid;
-        gap: 6px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
         padding: 4px 2px;
+        align-items: start;
+      }
+
+      .header-copy {
+        display: grid;
+        gap: 6px;
+      }
+
+      .badge-card {
+        min-width: 180px;
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(14, 27, 42, 0.92), rgba(8, 20, 32, 0.92));
+        border: 1px solid var(--panel-border);
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+      }
+
+      .badge-image {
+        width: 52px;
+        height: 52px;
+        display: block;
+      }
+
+      .badge-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+      }
+
+      .badge-value {
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+        color: var(--text);
       }
 
       .eyebrow {
@@ -254,6 +307,14 @@ export function renderComplexityWebview(webview: vscode.Webview, analysis: Compo
       .outputs .metric-value { color: #ffc38f; }
 
       @media (max-width: 980px) {
+        .header {
+          grid-template-columns: 1fr;
+        }
+
+        .badge-card {
+          justify-self: start;
+        }
+
         .network {
           grid-template-columns: 1fr;
           grid-template-rows: repeat(6, auto);
@@ -287,9 +348,16 @@ export function renderComplexityWebview(webview: vscode.Webview, analysis: Compo
   <body>
     <div class="shell">
       <section class="header">
-        <div class="eyebrow">Component</div>
-        <h1>${escapeHtml(analysis.component.name)}</h1>
-        <p class="subtitle">${escapeHtml(analysis.component.path)}</p>
+        <div class="header-copy">
+          <div class="eyebrow">Component</div>
+          <h1>${escapeHtml(analysis.component.name)}</h1>
+          <p class="subtitle">${escapeHtml(analysis.component.path)}</p>
+        </div>
+        <aside class="badge-card" aria-label="Analysis badge preview">
+          <div class="badge-label">Resolved Badge</div>
+          <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
+          <div class="badge-value">${escapeHtml(badgeLabel)}</div>
+        </aside>
       </section>
 
       <section class="diagram">

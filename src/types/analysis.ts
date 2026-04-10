@@ -44,3 +44,64 @@ export interface ComponentAnalysisResult {
   scores: AnalysisScores;
   meta: AnalysisMeta;
 }
+
+export interface BadgeGroups {
+  inputs: boolean;
+  stores: boolean;
+  injects: boolean;
+  outputs: boolean;
+}
+
+export type BadgeGroupName = keyof BadgeGroups;
+
+const BRAILLE_BASE = 0x2800;
+const BRAILLE_BITS: Record<BadgeGroupName, number> = {
+  stores: 0x1,
+  inputs: 0x2,
+  injects: 0x4,
+  outputs: 0x10
+};
+
+const GROUP_LABELS: Record<BadgeGroupName, string> = {
+  inputs: 'inputs',
+  stores: 'stores',
+  injects: 'injects',
+  outputs: 'outputs'
+};
+
+export function getBadgeGroups(analysis: ComponentAnalysisResult): BadgeGroups {
+  return {
+    inputs:
+      analysis.external.props.length > 0 ||
+      analysis.external.models.length > 0 ||
+      analysis.external.slots.length > 0,
+    stores: analysis.external.stores.length > 0,
+    injects: analysis.external.injects.length > 0,
+    outputs:
+      analysis.external.emits.length > 0 ||
+      analysis.external.exposed.length > 0 ||
+      analysis.external.slotProps.length > 0
+  };
+}
+
+export function getBadgeGlyph(groups: BadgeGroups) {
+  const codePoint = Object.entries(BRAILLE_BITS).reduce((total, [group, bit]) => {
+    return groups[group as BadgeGroupName] ? total + bit : total;
+  }, BRAILLE_BASE);
+
+  return codePoint === BRAILLE_BASE ? '◌' : String.fromCodePoint(codePoint);
+}
+
+export function getBadgeAssetName(groups: BadgeGroups) {
+  const activeGroups = getActiveBadgeGroups(groups);
+  return activeGroups.length > 0 ? `analysis-${activeGroups.join('-')}.svg` : 'analysis-empty.svg';
+}
+
+export function getBadgeCombinationLabel(groups: BadgeGroups) {
+  const activeGroups = getActiveBadgeGroups(groups);
+  return activeGroups.length > 0 ? activeGroups.map((group) => GROUP_LABELS[group]).join(' + ') : 'empty';
+}
+
+export function getActiveBadgeGroups(groups: BadgeGroups) {
+  return (Object.keys(groups) as BadgeGroupName[]).filter((group) => groups[group]);
+}

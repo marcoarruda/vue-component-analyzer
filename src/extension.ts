@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
       const analysis = cache.recompute(document);
       if (panel && panel.visible) {
         panel.title = `${analysis.component.name} Complexity`;
-        panel.webview.html = renderComplexityWebview(panel.webview, analysis);
+        panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
       }
       decorations.refresh(document.uri);
     }),
@@ -65,7 +65,7 @@ export function activate(context: vscode.ExtensionContext) {
       const analysis = await cache.analyzeUri(uri);
       if (panel && panel.visible) {
         panel.title = `${analysis.component.name} Complexity`;
-        panel.webview.html = renderComplexityWebview(panel.webview, analysis);
+        panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
       }
       decorations.refresh(uri);
     }),
@@ -93,7 +93,7 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
   if (panel) {
     panel.reveal(vscode.ViewColumn.Beside);
     panel.title = `${analysis.component.name} Complexity`;
-    panel.webview.html = renderComplexityWebview(panel.webview, analysis);
+    panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
     return;
   }
 
@@ -112,7 +112,7 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
     panel = undefined;
   });
 
-  panel.webview.html = renderComplexityWebview(panel.webview, analysis);
+  panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
 }
 
 async function primeWorkspaceVueFiles(cache: AnalysisCache, decorations: VueComplexityDecorationProvider) {
