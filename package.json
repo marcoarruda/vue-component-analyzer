@@ -329,6 +329,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/babel__traverse": "^7.28.0",
     "@types/node": "^24.0.0",
     "@types/vscode": "^1.100.0",
     "esbuild": "^0.25.0",

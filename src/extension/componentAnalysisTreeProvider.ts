@@ -41,13 +41,13 @@ export class VueAnalysisTreeProvider implements vscode.TreeDataProvider<vscode.T
     const label = path.basename(uri.fsPath);
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
 
-    item.description = `${getBadgeCombinationLabel(badgeGroups)} · ${analysis.scores.level}`;
+    item.description = `${getBadgeCombinationLabel(badgeGroups)} · ${analysis.scores.total}`;
     item.tooltip = new vscode.MarkdownString([
       `**${label}**`,
       '',
       `Path: ${relativePath}`,
       `Badge: ${badgeAsset}`,
-      `Complexity: ${analysis.scores.level} (${analysis.scores.total})`
+      `Complexity: ${analysis.scores.total}`
     ].join('\n'));
     item.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'file-badges', badgeAsset);
     item.resourceUri = uri;

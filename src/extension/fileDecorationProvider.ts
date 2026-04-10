@@ -53,7 +53,7 @@ function createTooltip(analysis: NonNullable<ReturnType<AnalysisCache['get']>>, 
   return [
     `Badge groups: ${getBadgeCombinationLabel(groups)}`,
     `Badge asset: ${getBadgeAssetName(groups)}`,
-    `Complexity: ${analysis.scores.level} (${analysis.scores.total})`,
+    `Complexity: ${analysis.scores.total}`,
     `Inputs props ${analysis.external.props.length}, v-model ${analysis.external.models.length}, slots ${analysis.external.slots.length}`,
     `External sources inject ${analysis.external.injects.length}, provide ${analysis.external.provides.length}`,
     `External sources stores ${analysis.external.stores.length}`,

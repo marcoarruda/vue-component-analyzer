@@ -82,9 +82,6 @@ export function renderComplexityWebview(
       .badge-card {
         min-width: 180px;
         padding: 16px 18px;
-        border-radius: 20px;
-        background: linear-gradient(180deg, rgba(14, 27, 42, 0.92), rgba(8, 20, 32, 0.92));
-        border: 1px solid var(--panel-border);
         display: grid;
         justify-items: center;
         gap: 10px;
@@ -151,21 +148,17 @@ export function renderComplexityWebview(
         padding: 20px;
       }
 
-      .diagram-header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        align-items: start;
-        margin-bottom: 18px;
-      }
-
       .diagram-header-copy {
         display: grid;
         gap: 6px;
         min-width: 0;
+        top: 0;
+        left: 0;
+        max-width: min(62%, 520px);
+        z-index: 2;
       }
 
-      .diagram-header .eyebrow {
+      .diagram-header-copy .eyebrow {
         margin-bottom: 0;
       }
 
@@ -191,6 +184,12 @@ export function renderComplexityWebview(
         gap: 18px;
         align-items: center;
         min-height: 560px;
+      }
+
+      .network .badge-card {
+        top: 0;
+        right: 0;
+        z-index: 2;
       }
 
       .connector {
@@ -318,18 +317,29 @@ export function renderComplexityWebview(
       .outputs .metric-value { color: #ffc38f; }
 
       @media (max-width: 980px) {
-        .diagram-header {
-          grid-template-columns: 1fr;
-        }
-
-        .badge-card {
-          justify-self: start;
-        }
-
         .network {
           grid-template-columns: 1fr;
-          grid-template-rows: repeat(6, auto);
+          grid-template-rows: repeat(8, auto);
           min-height: auto;
+          padding-top: 0;
+        }
+
+        .diagram-header-copy,
+        .network .badge-card {
+          position: static;
+          max-width: none;
+          justify-self: stretch;
+        }
+
+        .diagram-header-copy {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        .network .badge-card {
+          grid-column: 1;
+          grid-row: 2;
+          justify-self: start;
         }
 
         .connector {
@@ -347,12 +357,12 @@ export function renderComplexityWebview(
           justify-self: stretch;
         }
 
-        .cluster.external-source { grid-row: 1; }
-        .cluster.external-source-store { grid-row: 2; }
-        .component-node { grid-row: 3; }
-        .cluster.inputs { grid-row: 4; }
-        .cluster.outputs { grid-row: 5; }
-        .cluster.external-source-provide { grid-row: 6; }
+        .cluster.external-source { grid-row: 3; }
+        .cluster.external-source-store { grid-row: 4; }
+        .component-node { grid-row: 5; }
+        .cluster.inputs { grid-row: 6; }
+        .cluster.outputs { grid-row: 7; }
+        .cluster.external-source-provide { grid-row: 8; }
       }
     </style>
   </head>
@@ -360,7 +370,8 @@ export function renderComplexityWebview(
     <div class="shell">
       <section class="diagram">
         <article class="panel diagram-col">
-          <div class="diagram-header">
+          <div class="eyebrow">Attribute Diagram</div>
+          <div class="network">
             <div class="diagram-header-copy">
               <div class="eyebrow">Component</div>
               <h1>${escapeHtml(analysis.component.name)}</h1>
@@ -371,37 +382,33 @@ export function renderComplexityWebview(
               <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
               <div class="badge-value">${escapeHtml(badgeLabel)}</div>
             </aside>
-          </div>
-
-          <div class="eyebrow">Attribute Diagram</div>
-          <div class="network">
             <svg class="connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <line x1="18" y1="50" x2="43" y2="50" stroke="var(--inputs)" />
-              <line x1="50" y1="12" x2="50" y2="40" stroke="var(--external-sources)" />
-              <line x1="58" y1="18" x2="53" y2="40" stroke="var(--external-sources-alt)" />
-              <line x1="82" y1="50" x2="57" y2="50" stroke="var(--outputs)" />
-              <line x1="50" y1="88" x2="50" y2="60" stroke="var(--external-sources)" />
+              <line x1="18" y1="64" x2="43" y2="64" stroke="var(--inputs)" />
+              <line x1="50" y1="36" x2="50" y2="55" stroke="var(--external-sources)" />
+              <line x1="58" y1="40" x2="53" y2="55" stroke="var(--external-sources-alt)" />
+              <line x1="82" y1="64" x2="57" y2="64" stroke="var(--outputs)" />
+              <line x1="50" y1="92" x2="50" y2="72" stroke="var(--external-sources)" />
             </svg>
 
             <section class="cluster external-source">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${injectTotal}</div>
-              <div class="metric-list">${renderMetric('inject', injectTotal)}</div>
+              <div class="metric-list">${renderMetric('Injected', injectTotal)}</div>
             </section>
 
             <section class="cluster external-source-store">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${storeTotal}</div>
-              <div class="metric-list">${renderMetric('store', storeTotal)}</div>
+              <div class="metric-list">${renderMetric('Stores', storeTotal)}</div>
             </section>
 
             <section class="cluster inputs">
               <div class="cluster-title">Inputs</div>
               <div class="cluster-total">${inputTotal}</div>
               <div class="metric-list">
-                ${renderMetric('props', analysis.external.props.length)}
-                ${renderMetric('v-model', analysis.external.models.length)}
-                ${renderMetric('slots', analysis.external.slots.length)}
+                ${renderMetric('Props', analysis.external.props.length)}
+                ${renderMetric('V-Model', analysis.external.models.length)}
+                ${renderMetric('Slots', analysis.external.slots.length)}
               </div>
             </section>
 
@@ -414,16 +421,16 @@ export function renderComplexityWebview(
               <div class="cluster-title">Outputs</div>
               <div class="cluster-total">${outputTotal}</div>
               <div class="metric-list">
-                ${renderMetric('emit', analysis.external.emits.length)}
-                ${renderMetric('exposed', analysis.external.exposed.length)}
-                ${renderMetric('slotProps', analysis.external.slotProps.length)}
+                ${renderMetric('Emit', analysis.external.emits.length)}
+                ${renderMetric('Exposed', analysis.external.exposed.length)}
+                ${renderMetric('Slot Props', analysis.external.slotProps.length)}
               </div>
             </section>
 
             <section class="cluster external-source-provide">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${provideTotal}</div>
-              <div class="metric-list">${renderMetric('provide', provideTotal)}</div>
+              <div class="metric-list">${renderMetric('Provides', provideTotal)}</div>
             </section>
           </div>
         </article>

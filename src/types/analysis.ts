@@ -1,5 +1,3 @@
-export type ComplexityLevel = 'low' | 'medium' | 'high';
-
 export interface ComponentReference {
   name: string;
   path: string;
@@ -29,7 +27,6 @@ export interface AnalysisScores {
   external: number;
   internal: number;
   total: number;
-  level: ComplexityLevel;
 }
 
 export interface AnalysisMeta {

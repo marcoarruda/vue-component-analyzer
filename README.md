@@ -175,8 +175,7 @@ The analyzer is built around this JSON structure:
 	"scores": {
 		"external": 0,
 		"internal": 0,
-		"total": 0,
-		"level": "low"
+		"total": 0
 	},
 	"meta": {
 		"warnings": [],

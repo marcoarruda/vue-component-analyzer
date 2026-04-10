@@ -12,7 +12,7 @@ import {
 } from '@vue/compiler-dom';
 import { parse as parseSfc, type SFCDescriptor } from '@vue/compiler-sfc';
 
-import type { ComponentAnalysisResult, ComplexityLevel } from '../types/analysis';
+import type { ComponentAnalysisResult } from '../types/analysis';
 
 export interface AnalyzerInput {
   filePath: string;
@@ -218,7 +218,7 @@ function collectVariableMetrics(node: t.VariableDeclarator, analysis: ScriptAnal
   }
 
   if (isStoreComposableName(callName)) {
-    analysis.stores.add(callName);
+    analysis.stores.add(callName as string);
   }
 }
 
@@ -261,7 +261,7 @@ function collectCallMetrics(node: t.CallExpression, analysis: ScriptAnalysis, ty
   }
 
   if (isStoreComposableName(callName)) {
-    analysis.stores.add(callName);
+    analysis.stores.add(callName as string);
     return;
   }
 
@@ -545,18 +545,10 @@ function scoreAnalysis(external: ComponentAnalysisResult['external'], internal: 
   const internalScore = Object.values(internal).reduce((total, values) => total + values.length, 0);
   const total = externalScore + internalScore;
 
-  let level: ComplexityLevel = 'low';
-  if (total >= 12) {
-    level = 'high';
-  } else if (total >= 6) {
-    level = 'medium';
-  }
-
   return {
     external: externalScore,
     internal: internalScore,
-    total,
-    level
+    total
   };
 }
 
