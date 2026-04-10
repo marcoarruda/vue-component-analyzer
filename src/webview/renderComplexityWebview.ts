@@ -79,19 +79,6 @@ export function renderComplexityWebview(
         backdrop-filter: blur(12px);
       }
 
-      .header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        padding: 4px 2px;
-        align-items: start;
-      }
-
-      .header-copy {
-        display: grid;
-        gap: 6px;
-      }
-
       .badge-card {
         min-width: 180px;
         padding: 16px 18px;
@@ -162,6 +149,30 @@ export function renderComplexityWebview(
 
       .diagram-col {
         padding: 20px;
+      }
+
+      .diagram-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: start;
+        margin-bottom: 18px;
+      }
+
+      .diagram-header-copy {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .diagram-header .eyebrow {
+        margin-bottom: 0;
+      }
+
+      .diagram-path {
+        color: var(--muted);
+        font-size: 15px;
+        word-break: break-word;
       }
 
       .diagram {
@@ -307,7 +318,7 @@ export function renderComplexityWebview(
       .outputs .metric-value { color: #ffc38f; }
 
       @media (max-width: 980px) {
-        .header {
+        .diagram-header {
           grid-template-columns: 1fr;
         }
 
@@ -347,21 +358,21 @@ export function renderComplexityWebview(
   </head>
   <body>
     <div class="shell">
-      <section class="header">
-        <div class="header-copy">
-          <div class="eyebrow">Component</div>
-          <h1>${escapeHtml(analysis.component.name)}</h1>
-          <p class="subtitle">${escapeHtml(analysis.component.path)}</p>
-        </div>
-        <aside class="badge-card" aria-label="Analysis badge preview">
-          <div class="badge-label">Resolved Badge</div>
-          <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
-          <div class="badge-value">${escapeHtml(badgeLabel)}</div>
-        </aside>
-      </section>
-
       <section class="diagram">
         <article class="panel diagram-col">
+          <div class="diagram-header">
+            <div class="diagram-header-copy">
+              <div class="eyebrow">Component</div>
+              <h1>${escapeHtml(analysis.component.name)}</h1>
+              <p class="diagram-path">${escapeHtml(analysis.component.path)}</p>
+            </div>
+            <aside class="badge-card" aria-label="Analysis badge preview">
+              <div class="badge-label">Resolved Badge</div>
+              <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
+              <div class="badge-value">${escapeHtml(badgeLabel)}</div>
+            </aside>
+          </div>
+
           <div class="eyebrow">Attribute Diagram</div>
           <div class="network">
             <svg class="connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
