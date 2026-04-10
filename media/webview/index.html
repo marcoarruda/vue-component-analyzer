@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{CSP_SOURCE}}; style-src {{CSP_SOURCE}}; script-src 'nonce-{{SCRIPT_NONCE}}' {{CSP_SOURCE}};" />
+    <link rel="stylesheet" href="{{STYLES_URI}}" />
+    <title>Vue Component Complexity</title>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="diagram">
+        <article class="panel diagram-col">
+          <div class="network">
+            <div class="diagram-header-copy">
+              <div class="eyebrow">Component</div>
+              <p class="diagram-path">{{COMPONENT_PATH}}</p>
+            </div>
+            <aside class="badge-card" aria-label="Analysis badge preview">
+              <div class="badge-label">Badge</div>
+              <img class="badge-image" src="{{BADGE_ASSET_URI}}" alt="{{BADGE_LABEL}} badge" />
+              <div class="badge-value">{{BADGE_LABEL}}</div>
+            </aside>
+            <svg class="connector" aria-hidden="true">
+              <defs>
+                <marker id="connector-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" />
+                </marker>
+              </defs>
+              <line data-from="inputs" data-to="component" stroke="var(--inputs)"></line>
+              <line data-from="external-source" data-to="component" stroke="var(--external-sources)"></line>
+              <line data-from="external-source-store" data-to="component" stroke="var(--external-sources-alt)"></line>
+              <line data-from="component" data-to="outputs" stroke="var(--outputs)"></line>
+              <line data-from="component" data-to="external-source-provide" stroke="var(--external-sources)"></line>
+            </svg>
+
+            <section class="cluster external-source" data-node="external-source">
+              <div class="cluster-title">External Sources</div>
+              <div class="cluster-total">{{INJECT_TOTAL}}</div>
+              <div class="metric-list">{{INJECT_METRICS}}</div>
+            </section>
+
+            <section class="cluster external-source-store" data-node="external-source-store">
+              <div class="cluster-title">External Sources</div>
+              <div class="cluster-total">{{STORE_TOTAL}}</div>
+              <div class="metric-list">{{STORE_METRICS}}</div>
+            </section>
+
+            <section class="cluster inputs" data-node="inputs">
+              <div class="cluster-title">Inputs</div>
+              <div class="cluster-total">{{INPUT_TOTAL}}</div>
+              <div class="metric-list">{{INPUT_METRICS}}</div>
+            </section>
+
+            <section class="component-node" data-node="component">
+              <div class="node-title">Component</div>
+              <h2>{{COMPONENT_NAME}}</h2>
+            </section>
+
+            <section class="cluster outputs" data-node="outputs">
+              <div class="cluster-title">Outputs</div>
+              <div class="cluster-total">{{OUTPUT_TOTAL}}</div>
+              <div class="metric-list">{{OUTPUT_METRICS}}</div>
+            </section>
+
+            <section class="cluster external-source-provide" data-node="external-source-provide">
+              <div class="cluster-title">External Sources</div>
+              <div class="cluster-total">{{PROVIDE_TOTAL}}</div>
+              <div class="metric-list">{{PROVIDE_METRICS}}</div>
+            </section>
+          </div>
+        </article>
+      </section>
+    </div>
+    <script nonce="{{SCRIPT_NONCE}}" src="{{SCRIPT_URI}}"></script>
+  </body>
+</html>
