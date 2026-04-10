@@ -327,7 +327,8 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --packages=external --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
     "watch": "npm run build -- --watch",
-    "package": "vsce package"
+    "package": "vsce package",
+    "set:version": "node -e \"const fs=require('fs'); const pkgPath='package.json'; const version=process.env.RELEASE_VERSION || process.env.npm_config_version; if (!version) { console.error('Missing version. Use RELEASE_VERSION=<semver> npm run set:version'); process.exit(1); } const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8')); pkg.version=version; fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\\n'); console.log('package.json version set to', version);\""
   },
   "devDependencies": {
     "@types/babel__traverse": "^7.28.0",
