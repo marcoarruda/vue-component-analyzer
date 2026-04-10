@@ -4,6 +4,7 @@
   "displayName": "Vue Component Analyzer",
   "description": "Analyze Vue 3 components and visualize component complexity.",
   "publisher": "MarcoArruda",
+  "icon": "media/logo.png",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -335,6 +336,10 @@
     "esbuild": "^0.25.0",
     "typescript": "^5.8.0",
     "vsce": "^2.15.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcoarruda/vue-component-analyzer.git"
   },
   "dependencies": {
     "@babel/parser": "^7.29.2",

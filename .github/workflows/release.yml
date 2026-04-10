@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Read release metadata
+        id: metadata
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          tag_version="${GITHUB_REF_NAME#v}"
+
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$tag_version" >> "$GITHUB_OUTPUT"
+          echo "vsix_path=${package_name}-${tag_version}.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply release version to package.json
+        run: npm run set:version
+        env:
+          RELEASE_VERSION: ${{ steps.metadata.outputs.package_version }}
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Package VSIX
+        run: npx vsce package --out "${{ steps.metadata.outputs.vsix_path }}"
+
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish --packagePath "${{ steps.metadata.outputs.vsix_path }}"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.metadata.outputs.vsix_path }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
