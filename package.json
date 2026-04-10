@@ -19,7 +19,11 @@
     "commands": [
       {
         "command": "vueComponentAnalyzer.showComplexity",
-        "title": "Vue Analyzer: Show Complexity"
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/complexity.svg",
+          "dark": "media/complexity-dark.svg"
+        }
       },
       {
         "command": "vueComponentAnalyzer.showComplexity.empty",
@@ -297,6 +301,24 @@
           "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjectsOutputs",
           "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores-injects-outputs'",
           "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vueComponentAnalyzer",
+          "title": "Vue Analyzer",
+          "icon": "media/logo-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "vueComponentAnalyzer": [
+        {
+          "id": "vueComponentAnalyzer.components",
+          "name": "Vue Components",
+          "icon": "media/logo-sidebar.svg"
         }
       ]
     }

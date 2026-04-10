@@ -56,9 +56,13 @@ export type BadgeGroupName = keyof BadgeGroups;
 
 const BRAILLE_BASE = 0x2800;
 const BRAILLE_BITS: Record<BadgeGroupName, number> = {
-  stores: 0x1,
+  // two top dots
+  stores: 0x9,
+  // middle-left dot
   inputs: 0x2,
-  injects: 0x4,
+  // two bottom dots
+  injects: 0xc0,
+  // middle-right dot
   outputs: 0x10
 };
 

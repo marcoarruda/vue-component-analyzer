@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { AnalysisCache } from './extension/analysisCache';
+import { VueAnalysisTreeProvider } from './extension/componentAnalysisTreeProvider';
 import { VueComplexityDecorationProvider } from './extension/fileDecorationProvider';
 import { getBadgeAssetName, getBadgeGroups, type ComponentAnalysisResult } from './types/analysis';
 import { renderComplexityWebview } from './webview/renderComplexityWebview';
@@ -31,9 +32,10 @@ const SHOW_COMPLEXITY_COMMAND_IDS = [
 export function activate(context: vscode.ExtensionContext) {
   const cache = new AnalysisCache();
   const decorations = new VueComplexityDecorationProvider(cache);
+  const analysisTree = new VueAnalysisTreeProvider(cache, context.extensionUri);
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.vue');
-  const showComplexity = async () => {
-    const editor = vscode.window.activeTextEditor;
+  const showComplexity = async (targetUri?: vscode.Uri) => {
+    const editor = targetUri ? await openVueDocument(targetUri) : vscode.window.activeTextEditor;
 
     if (!editor || !isVueDocument(editor.document)) {
       void vscode.window.showInformationMessage('Open a Vue component to inspect its complexity.');
@@ -48,6 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
+    vscode.window.registerTreeDataProvider('vueComponentAnalyzer.components', analysisTree),
     watcher,
     ...SHOW_COMPLEXITY_COMMAND_IDS.map((commandId) => vscode.commands.registerCommand(commandId, showComplexity)),
     vscode.window.onDidChangeActiveTextEditor(async (editor) => {
@@ -58,6 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       await cache.getOrAnalyze(editor.document);
       decorations.refresh(editor.document.uri);
+      analysisTree.refresh();
       await updateTopbarBadgeContext(cache, editor);
     }),
     vscode.workspace.onDidOpenTextDocument(async (document) => {
@@ -67,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       await cache.getOrAnalyze(document);
       decorations.refresh(document.uri);
+      analysisTree.refresh();
 
        if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
@@ -83,6 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
         panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
       }
       decorations.refresh(document.uri);
+      analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
@@ -94,6 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
         panel.title = `${analysis.component.name} Complexity`;
       }
       decorations.refresh(uri);
+      analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
@@ -106,6 +113,7 @@ export function activate(context: vscode.ExtensionContext) {
         panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
       }
       decorations.refresh(uri);
+      analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
@@ -114,6 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
     watcher.onDidDelete(async (uri) => {
       cache.delete(uri);
       decorations.refresh(uri);
+      analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await vscode.commands.executeCommand('setContext', TOPBAR_BADGE_CONTEXT_KEY, 'analysis-empty');
@@ -125,13 +134,14 @@ export function activate(context: vscode.ExtensionContext) {
   if (activeDocument && isVueDocument(activeDocument)) {
     void cache.getOrAnalyze(activeDocument).then(async () => {
       decorations.refresh(activeDocument.uri);
+      analysisTree.refresh();
       await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
     });
   } else {
     void vscode.commands.executeCommand('setContext', TOPBAR_BADGE_CONTEXT_KEY, 'analysis-empty');
   }
 
-  void primeWorkspaceVueFiles(cache, decorations);
+  void primeWorkspaceVueFiles(cache, decorations, analysisTree);
 }
 
 export function deactivate() {}
@@ -141,8 +151,10 @@ function isVueDocument(document: vscode.TextDocument) {
 }
 
 function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited<ReturnType<AnalysisCache['getOrAnalyze']>>) {
+  const targetViewColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
+
   if (panel) {
-    panel.reveal(vscode.ViewColumn.Beside);
+    panel.reveal(targetViewColumn);
     panel.title = `${analysis.component.name} Complexity`;
     panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
     return;
@@ -151,7 +163,7 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
   panel = vscode.window.createWebviewPanel(
     'vueComponentAnalyzer.complexity',
     `${analysis.component.name} Complexity`,
-    vscode.ViewColumn.Beside,
+    targetViewColumn,
     {
       enableScripts: false,
       retainContextWhenHidden: true,
@@ -166,7 +178,11 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
   panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
 }
 
-async function primeWorkspaceVueFiles(cache: AnalysisCache, decorations: VueComplexityDecorationProvider) {
+async function primeWorkspaceVueFiles(
+  cache: AnalysisCache,
+  decorations: VueComplexityDecorationProvider,
+  analysisTree: VueAnalysisTreeProvider
+) {
   const vueFiles = await vscode.workspace.findFiles('**/*.vue', '**/node_modules/**', 200);
 
   await Promise.all(
@@ -175,6 +191,13 @@ async function primeWorkspaceVueFiles(cache: AnalysisCache, decorations: VueComp
       decorations.refresh(uri);
     })
   );
+
+  analysisTree.refresh();
+}
+
+async function openVueDocument(uri: vscode.Uri) {
+  const document = await vscode.workspace.openTextDocument(uri);
+  return vscode.window.showTextDocument(document, { preview: false });
 }
 
 async function updateTopbarBadgeContext(cache: AnalysisCache, editor: vscode.TextEditor | undefined) {
