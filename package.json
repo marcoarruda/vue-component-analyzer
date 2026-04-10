@@ -22,7 +22,7 @@
         "title": "Vue Analyzer: Show Complexity",
         "icon": {
           "light": "media/complexity.svg",
-          "dark": "media/complexity.svg"
+          "dark": "media/complexity-dark.svg"
         }
       }
     ],

@@ -2,11 +2,8 @@ import * as vscode from 'vscode';
 
 import { AnalysisCache } from './analysisCache';
 
-const CATEGORY_BADGES = {
-  blue: '🔵',
-  green: '🟢',
-  yellow: '🟡',
-  orange: '🟠',
+const COMPLEXITY_BADGES = {
+  complexity: '↗',
   empty: '◌'
 } as const;
 
@@ -41,26 +38,15 @@ export class VueComplexityDecorationProvider implements vscode.FileDecorationPro
 }
 
 function getBadge(analysis: NonNullable<ReturnType<AnalysisCache['get']>>) {
-  const badges = [
-    hasAny(analysis.external.props, analysis.external.models, analysis.external.slots) ? CATEGORY_BADGES.blue : '',
-    hasAny(analysis.external.injects, analysis.external.provides) ? CATEGORY_BADGES.green : '',
-    analysis.external.stores.length > 0 ? CATEGORY_BADGES.yellow : '',
-    hasAny(analysis.external.emits, analysis.external.exposed, analysis.external.slotProps) ? CATEGORY_BADGES.orange : ''
-  ].filter(Boolean);
-
-  return badges.join('') || CATEGORY_BADGES.empty;
+  return analysis.scores.total > 0 ? COMPLEXITY_BADGES.complexity : COMPLEXITY_BADGES.empty;
 }
 
 function createTooltip(analysis: NonNullable<ReturnType<AnalysisCache['get']>>) {
   return [
-    `${analysis.component.name} complexity: ${analysis.scores.level} (${analysis.scores.total})`,
-    `Blue props ${analysis.external.props.length}, v-model ${analysis.external.models.length}, slots ${analysis.external.slots.length}`,
-    `Green inject ${analysis.external.injects.length}, provide ${analysis.external.provides.length}`,
-    `Yellow stores ${analysis.external.stores.length}`,
-    `Orange emits ${analysis.external.emits.length}, exposed ${analysis.external.exposed.length}, slotProps ${analysis.external.slotProps.length}`
-  ].join(' • ');
-}
-
-function hasAny(...groups: string[][]) {
-  return groups.some((group) => group.length > 0);
+    `Complexity: ${analysis.scores.level} (${analysis.scores.total})`,
+    `Inputs props ${analysis.external.props.length}, v-model ${analysis.external.models.length}, slots ${analysis.external.slots.length}`,
+    `External sources inject ${analysis.external.injects.length}, provide ${analysis.external.provides.length}`,
+    `External sources stores ${analysis.external.stores.length}`,
+    `Outputs emits ${analysis.external.emits.length}, exposed ${analysis.external.exposed.length}, slotProps ${analysis.external.slotProps.length}`
+  ].join('\n');
 }
