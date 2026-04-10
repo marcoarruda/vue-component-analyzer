@@ -19,18 +19,283 @@
     "commands": [
       {
         "command": "vueComponentAnalyzer.showComplexity",
+        "title": "Vue Analyzer: Show Complexity"
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.empty",
         "title": "Vue Analyzer: Show Complexity",
         "icon": {
-          "light": "media/complexity.svg",
-          "dark": "media/complexity-dark.svg"
+          "light": "media/file-badges/analysis-empty.svg",
+          "dark": "media/file-badges/analysis-empty.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs.svg",
+          "dark": "media/file-badges/analysis-inputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.stores",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-stores.svg",
+          "dark": "media/file-badges/analysis-stores.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.injects",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-injects.svg",
+          "dark": "media/file-badges/analysis-injects.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.outputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-outputs.svg",
+          "dark": "media/file-badges/analysis-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsStores",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-stores.svg",
+          "dark": "media/file-badges/analysis-inputs-stores.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsInjects",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-injects.svg",
+          "dark": "media/file-badges/analysis-inputs-injects.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-outputs.svg",
+          "dark": "media/file-badges/analysis-inputs-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.storesInjects",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-stores-injects.svg",
+          "dark": "media/file-badges/analysis-stores-injects.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.storesOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-stores-outputs.svg",
+          "dark": "media/file-badges/analysis-stores-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.injectsOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-injects-outputs.svg",
+          "dark": "media/file-badges/analysis-injects-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjects",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-stores-injects.svg",
+          "dark": "media/file-badges/analysis-inputs-stores-injects.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsStoresOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-stores-outputs.svg",
+          "dark": "media/file-badges/analysis-inputs-stores-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsInjectsOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-injects-outputs.svg",
+          "dark": "media/file-badges/analysis-inputs-injects-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.storesInjectsOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-stores-injects-outputs.svg",
+          "dark": "media/file-badges/analysis-stores-injects-outputs.svg"
+        }
+      },
+      {
+        "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjectsOutputs",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/file-badges/analysis-inputs-stores-injects-outputs.svg",
+          "dark": "media/file-badges/analysis-inputs-stores-injects-outputs.svg"
         }
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "vueComponentAnalyzer.showComplexity.empty",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.stores",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.injects",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.outputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStores",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsInjects",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesInjects",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.injectsOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjects",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsInjectsOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesInjectsOutputs",
+          "when": "false"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjectsOutputs",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
-          "command": "vueComponentAnalyzer.showComplexity",
-          "when": "resourceExtname == .vue",
+          "command": "vueComponentAnalyzer.showComplexity.empty",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-empty'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.stores",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-stores'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.injects",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-injects'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.outputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStores",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsInjects",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-injects'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesInjects",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-stores-injects'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-stores-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.injectsOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-injects-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjects",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores-injects'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsInjectsOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-injects-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.storesInjectsOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-stores-injects-outputs'",
+          "group": "navigation"
+        },
+        {
+          "command": "vueComponentAnalyzer.showComplexity.inputsStoresInjectsOutputs",
+          "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-inputs-stores-injects-outputs'",
           "group": "navigation"
         }
       ]
