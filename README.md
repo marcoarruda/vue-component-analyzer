@@ -1,93 +1,116 @@
 # Vue Component Analyzer
 
-VS Code extension project for analyzing Vue 3 single-file components and visualizing component complexity.
+VS Code extension for inspecting the external contract and complexity profile of Vue 3 single-file components.
 
-The current version parses Vue single-file components with Vue compiler tooling and extracts component-facing signals into a versioned JSON structure.
+![Vue Component Analyzer overview](media/docs-001.png)
 
-## Goal
+## Features
 
-Build a single VS Code extension codebase that:
+- Editor title action for `.vue` files
+- Analysis webview with grouped signals and badge classification
+- Sidebar tree view under `Vue Analyzer`
+- File badges for common component profiles
+- Detail dialogs for props, slots, emits, stores, injects, provides, exposed members, and slot props
+- Cached analysis refreshed on open, save, and file watcher events
 
-- analyzes Vue 3 `.vue` files
-- extracts external dependencies and internal behaviors
-- produces stable, versioned JSON output
-- computes grouped complexity scores
-- shows results in a dedicated webview
-- adds explorer indicators based on complexity
-- keeps analyzer logic as independent from VS Code APIs as practical
+## Signals
 
-## Current status
+- Inputs: props, `v-model`, slots
+- Injected dependencies: inject usage
+- Stores: detected store references
+- Outputs: emits, exposed members, slot props
+- Provides: provided dependencies
+- Score: total complexity per file
+- Badge: summarized component profile
 
-Implemented now:
+Current parsing covers `<script setup>`, `<script>`, and `<template>` signals in Vue 3 SFCs.
 
-- editor title button for Vue files
-- command: `Vue Analyzer: Show Complexity`
-- webview panel with an attribute diagram and JSON output
-- Vue SFC parsing for `<script setup>`, `<script>`, and `<template>` signals
-- file-level explorer decorations for Vue files using right-side badge markers
-- in-memory cache with refresh on file open, save, and watcher events
-- sample Vue component for manual testing
+## Views
 
-Not implemented yet:
+### 1. See the component profile
 
-- configurable scoring weights
-- classic `setup()` and Options API support
+Run `Vue Analyzer: Show Complexity` from the editor title action.
 
-## Open This Project In VS Code
+![Component analysis diagram](media/docs-001.png)
 
-From the workspace root:
+### 2. Scan the whole workspace
 
-```sh
-cd /Users/marcoarruda/Projects/VSCode/vue-component-analyzer
-code .
+Browse analyzed `.vue` files in the `Vue Analyzer` activity bar view.
+
+![Vue Analyzer tree view](media/docs-002.png)
+
+### 3. Drill into exact details
+
+Open category dialogs from the webview for exact contract items.
+
+![Props detail dialog](media/docs-003.png)
+
+## Workflow
+
+1. Open a `.vue` file.
+2. Click the editor title badge or run `Vue Analyzer: Show Complexity`.
+3. Review the visual analysis panel.
+4. Open the `Vue Analyzer` sidebar to compare other components.
+5. Click a metric to inspect the exact items detected in that category.
+
+## Limitations
+
+- Configurable scoring weights are not implemented yet.
+- Classic `setup()` and full Options API coverage are not complete yet.
+
+## Output
+
+Versioned JSON result:
+
+```json
+{
+  "component": {
+    "name": "UserProfileCard",
+    "path": "src/components/UserProfileCard.vue"
+  },
+  "external": {
+    "props": [],
+    "emits": [],
+    "slots": [],
+    "models": [],
+    "injects": [],
+    "stores": [],
+    "apiCalls": [],
+    "exposed": []
+  },
+  "internal": {
+    "refs": [],
+    "computed": [],
+    "watchers": [],
+    "methods": []
+  },
+  "scores": {
+    "external": 0,
+    "internal": 0,
+    "total": 0
+  },
+  "meta": {
+    "warnings": [],
+    "version": 1
+  }
+}
 ```
 
-If you are already in VS Code, open the folder:
-
-- File -> Open Folder...
-- Select `vue-component-analyzer`
-
-Once opened, this folder is self-contained for continuing the extension work.
-
-## Local development
-
-Install dependencies once:
+## Development
 
 ```sh
 npm install
-```
-
-Build the extension bundle:
-
-```sh
 npm run build
 ```
 
-Rebuild after code changes:
-
-```sh
-npm run build
-```
-
-Launch the extension in development mode:
+Then launch the extension in development mode:
 
 1. Open this folder in VS Code.
 2. Press `F5`.
 3. In the Extension Development Host, open a `.vue` file.
-4. Click the editor title button to open the complexity view.
+4. Click the analyzer action in the editor title.
 
-## Quick manual test
-
-Use the included sample component:
-
-- `samples/UserProfileCard.vue`
-
-Expected behavior in the Extension Development Host:
-
-- the editor title button appears when the file is open
-- clicking the button opens a webview tab
-- the webview shows parsed Vue attributes around the component node and JSON
-- the explorer shows a right-side badge summarizing the attribute groups present
+Quick manual test: `samples/UserProfileCard.vue`.
 
 ## Scripts
 
@@ -99,95 +122,39 @@ Expected behavior in the Extension Development Host:
 
 ```text
 vue-component-analyzer/
-	media/
-		complexity.svg
-	samples/
-		UserProfileCard.vue
-	src/
-		analyzer/
-			index.ts
-			vueSfcAnalyzer.ts
-		extension/
-			analysisCache.ts
-			fileDecorationProvider.ts
-		types/
-			analysis.ts
-		webview/
-			renderComplexityWebview.ts
-		extension.ts
-	package.json
-	tsconfig.json
-	README.md
+  media/
+  samples/
+    UserProfileCard.vue
+  src/
+    analyzer/
+      index.ts
+      vueSfcAnalyzer.ts
+    extension/
+      analysisCache.ts
+      componentAnalysisTreeProvider.ts
+      fileDecorationProvider.ts
+    types/
+      analysis.ts
+    webview/
+      renderComplexityWebview.ts
+    extension.ts
+  package.json
+  tsconfig.json
+  README.md
 ```
 
-## Architecture notes
+## Architecture
 
-`src/analyzer`
+- `src/analyzer`: Vue analysis logic independent from VS Code APIs
+- `src/types`: versioned analysis contracts and shared type definitions
+- `src/extension`: VS Code integration such as cache, tree view, and decorations
+- `src/webview`: rendering logic for the analysis experience
+- `src/extension.ts`: extension activation, commands, watchers, and UI wiring
 
-- owns analysis logic
-- should stay independent from VS Code APIs
-- parses Vue SFC blocks and returns stable JSON through a versioned interface
-
-`src/types`
-
-- defines the versioned JSON contract returned by the analyzer
-
-`src/extension`
-
-- owns VS Code-specific integration such as cache and explorer decorations
-
-`src/webview`
-
-- renders the complexity result into a presentation layer for the panel
-
-`src/extension.ts`
-
-- activates the extension
-- registers commands and watchers
-- connects analyzer output to the webview and file decorations
-
-## Output shape
-
-The analyzer is built around this JSON structure:
-
-```json
-{
-	"component": {
-		"name": "UserProfileCard",
-		"path": "src/components/UserProfileCard.vue"
-	},
-	"external": {
-		"props": [],
-		"emits": [],
-		"slots": [],
-		"models": [],
-		"injects": [],
-		"stores": [],
-		"apiCalls": [],
-		"exposed": []
-	},
-	"internal": {
-		"refs": [],
-		"computed": [],
-		"watchers": [],
-		"methods": []
-	},
-	"scores": {
-		"external": 0,
-		"internal": 0,
-		"total": 0
-	},
-	"meta": {
-		"warnings": [],
-		"version": 1
-	}
-}
-```
-
-## Recommended next work
+## Roadmap
 
 1. Expand support for classic `setup()` and Options API patterns.
-2. Separate extraction and scoring modules.
+2. Separate extraction and scoring into clearer modules.
 3. Add configurable scoring weights.
-4. Broaden API call and store detection rules.
-5. Add analyzer tests for macro and template coverage.
+4. Broaden store and API call detection rules.
+5. Add automated analyzer coverage for macros and template patterns.
