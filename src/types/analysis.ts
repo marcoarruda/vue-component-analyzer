@@ -16,11 +16,36 @@ export interface AnalysisBucket {
   slotProps: string[];
 }
 
+export interface AnalysisDetailItem {
+  name: string;
+  type?: string;
+}
+
+export interface AnalysisDetailBucket {
+  props: AnalysisDetailItem[];
+  emits: AnalysisDetailItem[];
+  slots: AnalysisDetailItem[];
+  models: AnalysisDetailItem[];
+  injects: AnalysisDetailItem[];
+  provides: AnalysisDetailItem[];
+  stores: AnalysisDetailItem[];
+  apiCalls: AnalysisDetailItem[];
+  exposed: AnalysisDetailItem[];
+  slotProps: AnalysisDetailItem[];
+}
+
 export interface InternalAnalysisBucket {
   refs: string[];
   computed: string[];
   watchers: string[];
   methods: string[];
+}
+
+export interface InternalAnalysisDetailBucket {
+  refs: AnalysisDetailItem[];
+  computed: AnalysisDetailItem[];
+  watchers: AnalysisDetailItem[];
+  methods: AnalysisDetailItem[];
 }
 
 export interface AnalysisScores {
@@ -38,6 +63,10 @@ export interface ComponentAnalysisResult {
   component: ComponentReference;
   external: AnalysisBucket;
   internal: InternalAnalysisBucket;
+  details: {
+    external: AnalysisDetailBucket;
+    internal: InternalAnalysisDetailBucket;
+  };
   scores: AnalysisScores;
   meta: AnalysisMeta;
 }

@@ -1,5 +1,24 @@
 const network = document.querySelector('.network');
 const connector = document.querySelector('.connector');
+const detailsDialog = document.getElementById('details-dialog');
+const detailsDialogTitle = document.getElementById('details-dialog-title');
+const detailsDialogBody = document.getElementById('details-dialog-body');
+const detailsDialogClose = document.getElementById('details-dialog-close');
+const detailsPayloadElement = document.getElementById('analysis-details');
+const detailButtons = document.querySelectorAll('.metric-button');
+const detailSections = parseDetailSections(detailsPayloadElement);
+
+function parseDetailSections(payloadElement) {
+  if (!payloadElement) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(payloadElement.textContent || '{}');
+  } catch {
+    return {};
+  }
+}
 
 function anchorPoint(rect, targetRect) {
   const centerX = rect.left + rect.width / 2;
@@ -92,3 +111,75 @@ if (resizeObserver) {
 window.addEventListener('resize', renderConnectors);
 window.addEventListener('load', renderConnectors);
 renderConnectors();
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderDetailItems(section) {
+  if (!detailsDialogTitle || !detailsDialogBody) {
+    return;
+  }
+
+  detailsDialogTitle.textContent = section.title;
+
+  if (!Array.isArray(section.items) || section.items.length === 0) {
+    detailsDialogBody.innerHTML = '<p class="detail-empty">' + escapeHtml(section.emptyLabel) + '</p>';
+    return;
+  }
+
+  detailsDialogBody.innerHTML = '<ul class="detail-list">'
+    + section.items.map((item) => {
+      const typeMarkup = item.type
+        ? '<span class="detail-type">' + escapeHtml(item.type) + '</span>'
+        : '';
+
+      return '<li class="detail-item">'
+        + '<span class="detail-name">' + escapeHtml(item.name) + '</span>'
+        + typeMarkup
+        + '</li>';
+    }).join('')
+    + '</ul>';
+}
+
+function openDetailDialog(detailId) {
+  if (!detailsDialog || typeof detailsDialog.showModal !== 'function') {
+    return;
+  }
+
+  const section = detailSections[detailId];
+  if (!section || !Array.isArray(section.items) || section.items.length === 0) {
+    return;
+  }
+
+  renderDetailItems(section);
+  detailsDialog.showModal();
+}
+
+for (const button of detailButtons) {
+  button.addEventListener('click', () => {
+    const detailId = button.getAttribute('data-detail-id');
+    if (!detailId || button.disabled) {
+      return;
+    }
+
+    openDetailDialog(detailId);
+  });
+}
+
+if (detailsDialogClose && detailsDialog) {
+  detailsDialogClose.addEventListener('click', () => {
+    detailsDialog.close();
+  });
+
+  detailsDialog.addEventListener('click', (event) => {
+    if (event.target === detailsDialog) {
+      detailsDialog.close();
+    }
+  });
+}

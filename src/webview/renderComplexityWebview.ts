@@ -6,6 +6,7 @@ import {
   getBadgeAssetName,
   getBadgeCombinationLabel,
   getBadgeGroups,
+  type AnalysisDetailItem,
   type ComponentAnalysisResult
 } from '../types/analysis';
 
@@ -28,6 +29,7 @@ export function renderComplexityWebview(
   );
   const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'style.css'));
   const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'main.js'));
+  const detailPayload = createDetailPayload(analysis);
 
   return template
     .replaceAll('{{CSP_SOURCE}}', webview.cspSource)
@@ -38,16 +40,16 @@ export function renderComplexityWebview(
     .replaceAll('{{BADGE_ASSET_URI}}', String(badgeAssetUri))
     .replaceAll('{{BADGE_LABEL}}', escapeHtml(badgeLabel))
     .replaceAll('{{INJECT_TOTAL}}', String(injectTotal))
-    .replaceAll('{{INJECT_METRICS}}', renderMetric('Injected', injectTotal))
+    .replaceAll('{{INJECT_METRICS}}', renderMetric('Injected', 'injects', detailPayload.injects.items))
     .replaceAll('{{STORE_TOTAL}}', String(storeTotal))
-    .replaceAll('{{STORE_METRICS}}', renderMetric('Stores', storeTotal))
+    .replaceAll('{{STORE_METRICS}}', renderMetric('Stores', 'stores', detailPayload.stores.items))
     .replaceAll('{{INPUT_TOTAL}}', String(inputTotal))
     .replaceAll(
       '{{INPUT_METRICS}}',
       [
-        renderMetric('Props', analysis.external.props.length),
-        renderMetric('V-Model', analysis.external.models.length),
-        renderMetric('Slots', analysis.external.slots.length)
+        renderMetric('Props', 'props', detailPayload.props.items),
+        renderMetric('V-Model', 'models', detailPayload.models.items),
+        renderMetric('Slots', 'slots', detailPayload.slots.items)
       ].join('')
     )
     .replaceAll('{{COMPONENT_NAME}}', escapeHtml(analysis.component.name))
@@ -55,13 +57,70 @@ export function renderComplexityWebview(
     .replaceAll(
       '{{OUTPUT_METRICS}}',
       [
-        renderMetric('Emit', analysis.external.emits.length),
-        renderMetric('Exposed', analysis.external.exposed.length),
-        renderMetric('Slot Props', analysis.external.slotProps.length)
+        renderMetric('Emit', 'emits', detailPayload.emits.items),
+        renderMetric('Exposed', 'exposed', detailPayload.exposed.items),
+        renderMetric('Slot Props', 'slotProps', detailPayload.slotProps.items)
       ].join('')
     )
     .replaceAll('{{PROVIDE_TOTAL}}', String(provideTotal))
-    .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provides', provideTotal));
+    .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provides', 'provides', detailPayload.provides.items))
+    .replaceAll('{{ANALYSIS_DETAILS}}', serializeForScript(detailPayload));
+}
+
+interface DetailSection {
+  title: string;
+  emptyLabel: string;
+  items: AnalysisDetailItem[];
+}
+
+function createDetailPayload(analysis: ComponentAnalysisResult): Record<string, DetailSection> {
+  return {
+    props: {
+      title: 'Props',
+      emptyLabel: 'No props were detected.',
+      items: analysis.details.external.props
+    },
+    models: {
+      title: 'V-Model',
+      emptyLabel: 'No models were detected.',
+      items: analysis.details.external.models
+    },
+    slots: {
+      title: 'Slots',
+      emptyLabel: 'No slots were detected.',
+      items: analysis.details.external.slots
+    },
+    injects: {
+      title: 'Injected Dependencies',
+      emptyLabel: 'No injected dependencies were detected.',
+      items: analysis.details.external.injects
+    },
+    stores: {
+      title: 'Stores',
+      emptyLabel: 'No stores were detected.',
+      items: analysis.details.external.stores
+    },
+    emits: {
+      title: 'Emits',
+      emptyLabel: 'No emitted events were detected.',
+      items: analysis.details.external.emits
+    },
+    exposed: {
+      title: 'Exposed Members',
+      emptyLabel: 'No exposed members were detected.',
+      items: analysis.details.external.exposed
+    },
+    slotProps: {
+      title: 'Slot Props',
+      emptyLabel: 'No slot props were detected.',
+      items: analysis.details.external.slotProps
+    },
+    provides: {
+      title: 'Provided Dependencies',
+      emptyLabel: 'No provided dependencies were detected.',
+      items: analysis.details.external.provides
+    }
+  };
 }
 
 let complexityTemplateCache: string | undefined;
@@ -87,8 +146,20 @@ function createNonce() {
   return value;
 }
 
-function renderMetric(label: string, count: number) {
-  return `<div class="metric"><span class="metric-name">${escapeHtml(label)}</span><span class="metric-value">${count}</span></div>`;
+function renderMetric(label: string, detailId: string, items: AnalysisDetailItem[]) {
+  const count = items.length;
+  const disabledAttributes = count === 0 ? ' disabled aria-disabled="true"' : '';
+
+  return `<button class="metric metric-button" type="button" data-detail-id="${escapeHtml(detailId)}"${disabledAttributes}><span class="metric-name">${escapeHtml(label)}</span><span class="metric-value">${count}</span></button>`;
+}
+
+function serializeForScript(value: unknown) {
+  return JSON.stringify(value)
+    .replaceAll('&', '\\u0026')
+    .replaceAll('<', '\\u003C')
+    .replaceAll('>', '\\u003E')
+    .replaceAll('\u2028', '\\u2028')
+    .replaceAll('\u2029', '\\u2029');
 }
 
 function escapeHtml(value: string) {

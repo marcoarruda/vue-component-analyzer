@@ -12,7 +12,7 @@ import {
 } from '@vue/compiler-dom';
 import { parse as parseSfc, type SFCDescriptor } from '@vue/compiler-sfc';
 
-import type { ComponentAnalysisResult } from '../types/analysis';
+import type { AnalysisDetailItem, ComponentAnalysisResult } from '../types/analysis';
 
 export interface AnalyzerInput {
   filePath: string;
@@ -21,9 +21,11 @@ export interface AnalyzerInput {
 
 interface ScriptAnalysis {
   props: Set<string>;
+  propDetails: Map<string, string | undefined>;
   emits: Set<string>;
   slots: Set<string>;
   models: Set<string>;
+  modelDetails: Map<string, string | undefined>;
   injects: Set<string>;
   provides: Set<string>;
   stores: Set<string>;
@@ -71,6 +73,27 @@ export function analyzeVueSfcComponent(input: AnalyzerInput): ComponentAnalysisR
     methods: sortValues(scriptAnalysis.methods)
   };
 
+  const details = {
+    external: {
+      props: sortDetailedValues(external.props, scriptAnalysis.propDetails),
+      emits: toDetailItems(external.emits),
+      slots: toDetailItems(external.slots),
+      models: sortDetailedValues(external.models, scriptAnalysis.modelDetails),
+      injects: toDetailItems(external.injects),
+      provides: toDetailItems(external.provides),
+      stores: toDetailItems(external.stores),
+      apiCalls: toDetailItems(external.apiCalls),
+      exposed: toDetailItems(external.exposed),
+      slotProps: toDetailItems(external.slotProps)
+    },
+    internal: {
+      refs: toDetailItems(internal.refs),
+      computed: toDetailItems(internal.computed),
+      watchers: toDetailItems(internal.watchers),
+      methods: toDetailItems(internal.methods)
+    }
+  };
+
   return {
     component: {
       name: inferComponentName(input.filePath),
@@ -78,6 +101,7 @@ export function analyzeVueSfcComponent(input: AnalyzerInput): ComponentAnalysisR
     },
     external,
     internal,
+    details,
     scores: scoreAnalysis(external, internal),
     meta: {
       warnings,
@@ -227,13 +251,18 @@ function collectCallMetrics(node: t.CallExpression, analysis: ScriptAnalysis, ty
 
   switch (callName) {
     case 'defineProps':
-      addAll(analysis.props, extractMacroEntries(node, types, 'prop'));
+      mergeDetails(analysis.propDetails, extractPropDetails(node, types));
+      addAll(analysis.props, analysis.propDetails.keys());
       return;
     case 'defineEmits':
       addAll(analysis.emits, extractEmitEntries(node, types));
       return;
     case 'defineModel':
-      analysis.models.add(extractModelName(node));
+      {
+        const modelDetail = extractModelDetail(node);
+        analysis.models.add(modelDetail.name);
+        analysis.modelDetails.set(modelDetail.name, modelDetail.type);
+      }
       return;
     case 'defineExpose':
       addAll(analysis.exposed, extractExposeEntries(node));
@@ -283,6 +312,23 @@ function extractMacroEntries(call: t.CallExpression, types: Map<string, t.TSType
 
   if (entries.size === 0 && firstArgument) {
     entries.add(fallbackPrefix);
+  }
+
+  return entries;
+}
+
+function extractPropDetails(call: t.CallExpression, types: Map<string, t.TSType>) {
+  const entries = new Map<string, string | undefined>();
+  const [firstArgument] = call.arguments;
+
+  if (t.isObjectExpression(firstArgument)) {
+    mergeDetails(entries, extractObjectPropDetails(firstArgument.properties, 'prop'));
+  }
+
+  mergeDetails(entries, extractTypeDetailEntries(getCallTypes(call), types, 'prop'));
+
+  if (entries.size === 0 && firstArgument) {
+    entries.set('prop', undefined);
   }
 
   return entries;
@@ -342,6 +388,15 @@ function extractModelName(call: t.CallExpression) {
   return 'modelValue';
 }
 
+function extractModelDetail(call: t.CallExpression): AnalysisDetailItem {
+  const typeNode = getCallTypes(call)[0];
+
+  return {
+    name: extractModelName(call),
+    type: typeNode ? stringifyTypeNode(typeNode) : undefined
+  };
+}
+
 function extractNamedKey(argument: t.CallExpression['arguments'][number] | undefined, fallback: string) {
   if (!argument) {
     return fallback;
@@ -367,6 +422,16 @@ function extractTypeEntries(types: readonly t.TSType[], knownTypes: Map<string, 
 
   for (const typeNode of types) {
     addAll(entries, extractTypeNodeEntries(typeNode, knownTypes, fallbackPrefix));
+  }
+
+  return entries;
+}
+
+function extractTypeDetailEntries(types: readonly t.TSType[], knownTypes: Map<string, t.TSType>, fallbackPrefix: string) {
+  const entries = new Map<string, string | undefined>();
+
+  for (const typeNode of types) {
+    mergeDetails(entries, extractTypeNodeDetails(typeNode, knownTypes, fallbackPrefix));
   }
 
   return entries;
@@ -450,6 +515,50 @@ function extractTypeNodeEntries(typeNode: t.TSType, knownTypes: Map<string, t.TS
   return new Set([fallbackPrefix]);
 }
 
+function extractTypeNodeDetails(
+  typeNode: t.TSType,
+  knownTypes: Map<string, t.TSType>,
+  fallbackPrefix: string
+) {
+  if (t.isTSTypeLiteral(typeNode)) {
+    const entries = new Map<string, string | undefined>();
+
+    for (const member of typeNode.members) {
+      if (!t.isTSPropertySignature(member)) {
+        continue;
+      }
+
+      const key = getPropertyKeyName(member.key);
+      if (!key) {
+        continue;
+      }
+
+      entries.set(key, member.typeAnnotation ? stringifyTypeNode(member.typeAnnotation.typeAnnotation) : undefined);
+    }
+
+    return entries;
+  }
+
+  if (t.isTSIntersectionType(typeNode) || t.isTSUnionType(typeNode)) {
+    const entries = new Map<string, string | undefined>();
+
+    for (const nested of typeNode.types) {
+      mergeDetails(entries, extractTypeNodeDetails(nested, knownTypes, fallbackPrefix));
+    }
+
+    return entries;
+  }
+
+  if (t.isTSTypeReference(typeNode)) {
+    const resolved = resolveTypeReference(typeNode, knownTypes);
+    if (resolved) {
+      return extractTypeNodeDetails(resolved, knownTypes, fallbackPrefix);
+    }
+  }
+
+  return new Map([[fallbackPrefix, stringifyTypeNode(typeNode)]]);
+}
+
 function extractObjectKeys(properties: Array<t.ObjectMethod | t.ObjectProperty | t.SpreadElement>, fallbackPrefix: string) {
   const entries = new Set<string>();
 
@@ -461,6 +570,31 @@ function extractObjectKeys(properties: Array<t.ObjectMethod | t.ObjectProperty |
 
     const key = getPropertyKeyName(property.key);
     entries.add(key || fallbackPrefix);
+  }
+
+  return entries;
+}
+
+function extractObjectPropDetails(
+  properties: Array<t.ObjectMethod | t.ObjectProperty | t.SpreadElement>,
+  fallbackPrefix: string
+) {
+  const entries = new Map<string, string | undefined>();
+
+  for (const property of properties) {
+    if (t.isSpreadElement(property)) {
+      entries.set(fallbackPrefix, undefined);
+      continue;
+    }
+
+    const key = getPropertyKeyName(property.key);
+    if (!key) {
+      entries.set(fallbackPrefix, undefined);
+      continue;
+    }
+
+    const type = t.isObjectProperty(property) ? inferRuntimePropType(property.value) : undefined;
+    entries.set(key, type);
   }
 
   return entries;
@@ -499,6 +633,147 @@ function getPropertyKeyName(node: t.Expression | t.Identifier | t.PrivateName | 
   }
 
   return undefined;
+}
+
+function inferRuntimePropType(node: t.Node): string | undefined {
+  if (t.isIdentifier(node) && isRuntimeTypeName(node.name)) {
+    return node.name;
+  }
+
+  if (t.isTSAsExpression(node) || t.isTSTypeAssertion(node)) {
+    return inferRuntimePropType(node.expression);
+  }
+
+  if (t.isArrayExpression(node)) {
+    const members = node.elements
+      .map((element) => (element ? inferRuntimePropType(element) : undefined))
+      .filter((value): value is string => Boolean(value));
+
+    return members.length > 0 ? members.join(' | ') : undefined;
+  }
+
+  if (t.isObjectExpression(node)) {
+    for (const property of node.properties) {
+      if (!t.isObjectProperty(property)) {
+        continue;
+      }
+
+      const key = getPropertyKeyName(property.key);
+      if (key === 'type') {
+        return inferRuntimePropType(property.value);
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function isRuntimeTypeName(value: string) {
+  return ['String', 'Number', 'Boolean', 'Array', 'Object', 'Function', 'Date', 'Symbol'].includes(value);
+}
+
+function stringifyTypeNode(typeNode: t.TSType): string {
+  if (t.isTSStringKeyword(typeNode)) {
+    return 'string';
+  }
+
+  if (t.isTSNumberKeyword(typeNode)) {
+    return 'number';
+  }
+
+  if (t.isTSBooleanKeyword(typeNode)) {
+    return 'boolean';
+  }
+
+  if (t.isTSAnyKeyword(typeNode)) {
+    return 'any';
+  }
+
+  if (t.isTSUnknownKeyword(typeNode)) {
+    return 'unknown';
+  }
+
+  if (t.isTSVoidKeyword(typeNode)) {
+    return 'void';
+  }
+
+  if (t.isTSNullKeyword(typeNode)) {
+    return 'null';
+  }
+
+  if (t.isTSUndefinedKeyword(typeNode)) {
+    return 'undefined';
+  }
+
+  if (t.isTSNeverKeyword(typeNode)) {
+    return 'never';
+  }
+
+  if (t.isTSLiteralType(typeNode)) {
+    if (t.isStringLiteral(typeNode.literal)) {
+      return `'${typeNode.literal.value}'`;
+    }
+
+    if (t.isNumericLiteral(typeNode.literal) || t.isBigIntLiteral(typeNode.literal)) {
+      return String(typeNode.literal.value);
+    }
+
+    if (typeNode.literal.type === 'BooleanLiteral') {
+      return typeNode.literal.value ? 'true' : 'false';
+    }
+  }
+
+  if (t.isTSUnionType(typeNode)) {
+    return typeNode.types.map((member) => stringifyTypeNode(member)).join(' | ');
+  }
+
+  if (t.isTSIntersectionType(typeNode)) {
+    return typeNode.types.map((member) => stringifyTypeNode(member)).join(' & ');
+  }
+
+  if (t.isTSArrayType(typeNode)) {
+    return `${stringifyTypeNode(typeNode.elementType)}[]`;
+  }
+
+  if (t.isTSTupleType(typeNode)) {
+    return `[${typeNode.elementTypes.map((member) => stringifyTupleMember(member)).join(', ')}]`;
+  }
+
+  if (t.isTSParenthesizedType(typeNode)) {
+    return `(${stringifyTypeNode(typeNode.typeAnnotation)})`;
+  }
+
+  if (t.isTSTypeReference(typeNode)) {
+    const typeName = stringifyTypeName(typeNode.typeName);
+    const params = typeNode.typeParameters?.params.map((member) => stringifyTypeNode(member)) ?? [];
+    return params.length > 0 ? `${typeName}<${params.join(', ')}>` : typeName;
+  }
+
+  if (t.isTSTypeLiteral(typeNode)) {
+    return '{ ... }';
+  }
+
+  if (t.isTSFunctionType(typeNode)) {
+    return '(...args) => unknown';
+  }
+
+  return 'unknown';
+}
+
+function stringifyTypeName(node: t.TSEntityName): string {
+  if (t.isIdentifier(node)) {
+    return node.name;
+  }
+
+  return `${stringifyTypeName(node.left)}.${node.right.name}`;
+}
+
+function stringifyTupleMember(member: t.TSType | t.TSNamedTupleMember): string {
+  if (t.isTSNamedTupleMember(member)) {
+    return `${member.label.name}: ${stringifyTypeNode(member.elementType)}`;
+  }
+
+  return stringifyTypeNode(member);
 }
 
 function getCallTypes(call: t.CallExpression) {
@@ -555,9 +830,11 @@ function scoreAnalysis(external: ComponentAnalysisResult['external'], internal: 
 function createEmptyScriptAnalysis(): ScriptAnalysis {
   return {
     props: new Set<string>(),
+    propDetails: new Map<string, string | undefined>(),
     emits: new Set<string>(),
     slots: new Set<string>(),
     models: new Set<string>(),
+    modelDetails: new Map<string, string | undefined>(),
     injects: new Set<string>(),
     provides: new Set<string>(),
     stores: new Set<string>(),
@@ -579,6 +856,19 @@ function sortValues(values: Iterable<string>) {
   return Array.from(values).sort((left, right) => left.localeCompare(right));
 }
 
+function sortDetailedValues(values: readonly string[], details: Map<string, string | undefined>): AnalysisDetailItem[] {
+  return values
+    .map((name) => ({
+      name,
+      type: details.get(name)
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function toDetailItems(values: readonly string[]): AnalysisDetailItem[] {
+  return values.map((name) => ({ name }));
+}
+
 function mergeSets<T>(...sets: Iterable<T>[]) {
   const result = new Set<T>();
   for (const set of sets) {
@@ -592,6 +882,13 @@ function mergeSets<T>(...sets: Iterable<T>[]) {
 function addAll<T>(target: Set<T>, values: Iterable<T>) {
   for (const value of values) {
     target.add(value);
+  }
+}
+
+function mergeDetails(target: Map<string, string | undefined>, source: Map<string, string | undefined>) {
+  for (const [name, type] of source) {
+    const existingType = target.get(name);
+    target.set(name, existingType ?? type);
   }
 }
 

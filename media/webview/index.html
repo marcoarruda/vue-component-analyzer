@@ -72,6 +72,19 @@
         </article>
       </section>
     </div>
+    <dialog class="details-dialog" id="details-dialog" aria-labelledby="details-dialog-title">
+      <div class="details-dialog__surface">
+        <div class="details-dialog__header">
+          <div>
+            <div class="eyebrow">Component Details</div>
+            <h2 id="details-dialog-title">Details</h2>
+          </div>
+          <button class="details-dialog__close" id="details-dialog-close" type="button" aria-label="Close details dialog">Close</button>
+        </div>
+        <div class="details-dialog__body" id="details-dialog-body"></div>
+      </div>
+    </dialog>
+    <script id="analysis-details" type="application/json">{{ANALYSIS_DETAILS}}</script>
     <script nonce="{{SCRIPT_NONCE}}" src="{{SCRIPT_URI}}"></script>
   </body>
 </html>
