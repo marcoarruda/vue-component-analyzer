@@ -159,7 +159,6 @@ export function renderComplexityWebview(
         grid-column: 1;
         grid-row: 1;
         align-self: start;
-        max-width: min(62%, 520px);
         z-index: 2;
       }
 
@@ -184,7 +183,7 @@ export function renderComplexityWebview(
       .network {
         position: relative;
         display: grid;
-        grid-template-columns: minmax(170px, 1fr) minmax(180px, 240px) minmax(170px, 1fr);
+        grid-template-columns: repeat(3, minmax(170px, 1fr));
         grid-template-rows: auto 1fr auto;
         gap: 18px;
         align-items: center;
@@ -386,15 +385,13 @@ export function renderComplexityWebview(
     <div class="shell">
       <section class="diagram">
         <article class="panel diagram-col">
-          <div class="eyebrow">Attribute Diagram</div>
           <div class="network">
             <div class="diagram-header-copy">
               <div class="eyebrow">Component</div>
-              <h1>${escapeHtml(analysis.component.name)}</h1>
               <p class="diagram-path">${escapeHtml(analysis.component.path)}</p>
             </div>
             <aside class="badge-card" aria-label="Analysis badge preview">
-              <div class="badge-label">Resolved Badge</div>
+              <div class="badge-label">Badge</div>
               <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
               <div class="badge-value">${escapeHtml(badgeLabel)}</div>
             </aside>
@@ -482,6 +479,31 @@ export function renderComplexityWebview(
         };
       }
 
+      function connectorPoints(fromKey, toKey, fromRect, toRect) {
+        if (
+          toKey === 'component'
+          && (fromKey === 'external-source' || fromKey === 'external-source-store')
+        ) {
+          const centerX = fromRect.left + fromRect.width / 2;
+
+          return {
+            start: {
+              x: centerX,
+              y: fromRect.bottom
+            },
+            end: {
+              x: centerX,
+              y: toRect.top
+            }
+          };
+        }
+
+        return {
+          start: anchorPoint(fromRect, toRect),
+          end: anchorPoint(toRect, fromRect)
+        };
+      }
+
       function renderConnectors() {
         if (!network || !connector || window.innerWidth <= 980) {
           return;
@@ -502,8 +524,7 @@ export function renderComplexityWebview(
 
           const fromRect = fromElement.getBoundingClientRect();
           const toRect = toElement.getBoundingClientRect();
-          const start = anchorPoint(fromRect, toRect);
-          const end = anchorPoint(toRect, fromRect);
+          const { start, end } = connectorPoints(fromKey, toKey, fromRect, toRect);
 
           line.setAttribute('x1', String(start.x - networkRect.left));
           line.setAttribute('y1', String(start.y - networkRect.top));
