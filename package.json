@@ -1,0 +1,51 @@
+{
+  "name": "vue-component-analyzer",
+  "version": "0.0.1",
+  "displayName": "Vue Component Analyzer",
+  "description": "Analyze Vue 3 components and visualize component complexity.",
+  "publisher": "MarcoArruda",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:vue",
+    "workspaceContains:**/*.vue"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vueComponentAnalyzer.showComplexity",
+        "title": "Vue Analyzer: Show Complexity",
+        "icon": {
+          "light": "media/complexity.svg",
+          "dark": "media/complexity.svg"
+        }
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "vueComponentAnalyzer.showComplexity",
+          "when": "resourceExtname == .vue",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
+    "watch": "npm run build -- --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.100.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0",
+    "vsce": "^2.15.0"
+  }
+}
