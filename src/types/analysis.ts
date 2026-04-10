@@ -11,9 +11,11 @@ export interface AnalysisBucket {
   slots: string[];
   models: string[];
   injects: string[];
+  provides: string[];
   stores: string[];
   apiCalls: string[];
   exposed: string[];
+  slotProps: string[];
 }
 
 export interface InternalAnalysisBucket {

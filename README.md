@@ -2,7 +2,7 @@
 
 VS Code extension project for analyzing Vue 3 single-file components and visualizing component complexity.
 
-The current version is a minimal working prototype. It already wires the extension UI end to end, but the analyzer still returns mock data. The next implementation step is replacing the mock analyzer with real Vue SFC parsing, starting with `<script setup>`.
+The current version parses Vue single-file components with Vue compiler tooling and extracts component-facing signals into a versioned JSON structure.
 
 ## Goal
 
@@ -22,17 +22,14 @@ Implemented now:
 
 - editor title button for Vue files
 - command: `Vue Analyzer: Show Complexity`
-- webview panel with summary cards and JSON output
-- mock analyzer result with stable output shape
-- file-level explorer decorations for Vue files
+- webview panel with an attribute diagram and JSON output
+- Vue SFC parsing for `<script setup>`, `<script>`, and `<template>` signals
+- file-level explorer decorations for Vue files using right-side badge markers
 - in-memory cache with refresh on file open, save, and watcher events
 - sample Vue component for manual testing
 
 Not implemented yet:
 
-- real Vue SFC parsing
-- extraction of props, emits, slots, models, injects, stores, API calls, exposed methods
-- extraction of refs, computed values, watchers, and methods from actual source
 - configurable scoring weights
 - classic `setup()` and Options API support
 
@@ -89,8 +86,8 @@ Expected behavior in the Extension Development Host:
 
 - the editor title button appears when the file is open
 - clicking the button opens a webview tab
-- the webview shows mock complexity data and JSON
-- the explorer shows a decoration badge for the Vue file
+- the webview shows parsed Vue attributes around the component node and JSON
+- the explorer shows a right-side badge summarizing the attribute groups present
 
 ## Scripts
 
@@ -109,7 +106,7 @@ vue-component-analyzer/
 	src/
 		analyzer/
 			index.ts
-			mockAnalyzer.ts
+			vueSfcAnalyzer.ts
 		extension/
 			analysisCache.ts
 			fileDecorationProvider.ts
@@ -129,7 +126,7 @@ vue-component-analyzer/
 
 - owns analysis logic
 - should stay independent from VS Code APIs
-- currently returns mock data through a stable interface
+- parses Vue SFC blocks and returns stable JSON through a versioned interface
 
 `src/types`
 
@@ -190,8 +187,8 @@ The analyzer is built around this JSON structure:
 
 ## Recommended next work
 
-1. Add Vue SFC parsing with `@vue/compiler-sfc`.
-2. Extract real signals from `<script setup>` first.
-3. Separate extraction and scoring modules.
-4. Add configurable scoring weights.
-5. Replace the placeholder webview diagram with a real structure visualization.
+1. Expand support for classic `setup()` and Options API patterns.
+2. Separate extraction and scoring modules.
+3. Add configurable scoring weights.
+4. Broaden API call and store detection rules.
+5. Add analyzer tests for macro and template coverage.

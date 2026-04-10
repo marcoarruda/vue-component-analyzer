@@ -1,5 +1,5 @@
 import type { ComponentAnalysisResult } from '../types/analysis';
-import { analyzeMockVueComponent } from './mockAnalyzer';
+import { analyzeVueSfcComponent } from './vueSfcAnalyzer';
 
 export interface AnalyzeVueFileInput {
   filePath: string;
@@ -7,5 +7,5 @@ export interface AnalyzeVueFileInput {
 }
 
 export function analyzeVueFile(input: AnalyzeVueFileInput): ComponentAnalysisResult {
-  return analyzeMockVueComponent(input);
+  return analyzeVueSfcComponent(input);
 }
