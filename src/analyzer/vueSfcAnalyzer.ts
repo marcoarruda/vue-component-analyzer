@@ -33,7 +33,8 @@ interface ScriptAnalysis {
   exposed: Set<string>;
   refs: Set<string>;
   computed: Set<string>;
-  watchers: Set<string>;
+  watchers: string[];
+  watcherDetails: AnalysisDetailItem[];
   methods: Set<string>;
   warnings: string[];
 }
@@ -89,7 +90,7 @@ export function analyzeVueSfcComponent(input: AnalyzerInput): ComponentAnalysisR
     internal: {
       refs: toDetailItems(internal.refs),
       computed: toDetailItems(internal.computed),
-      watchers: toDetailItems(internal.watchers),
+      watchers: sortAnalysisDetailItems(scriptAnalysis.watcherDetails),
       methods: toDetailItems(internal.methods)
     }
   };
@@ -280,7 +281,8 @@ function collectCallMetrics(node: t.CallExpression, analysis: ScriptAnalysis, ty
     case 'watchEffect':
     case 'watchPostEffect':
     case 'watchSyncEffect':
-      analysis.watchers.add(callName);
+      analysis.watchers.push(callName);
+      analysis.watcherDetails.push(extractWatcherDetail(node, callName));
       return;
     case 'fetch':
       analysis.apiCalls.add('fetch');
@@ -415,6 +417,93 @@ function extractNamedKey(argument: t.CallExpression['arguments'][number] | undef
   }
 
   return fallback;
+}
+
+function extractWatcherDetail(call: t.CallExpression, callName: string): AnalysisDetailItem {
+  return {
+    name: callName,
+    type: extractWatchSource(call, callName)
+  };
+}
+
+function extractWatchSource(call: t.CallExpression, callName: string) {
+  if (callName !== 'watch') {
+    return undefined;
+  }
+
+  const [source] = call.arguments;
+  return stringifyReactiveSource(source);
+}
+
+function stringifyReactiveSource(node: t.CallExpression['arguments'][number] | undefined): string | undefined {
+  if (!node) {
+    return undefined;
+  }
+
+  if (t.isTSAsExpression(node) || t.isTSTypeAssertion(node)) {
+    return stringifyReactiveSource(node.expression);
+  }
+
+  if (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) {
+    if (node.params.length > 0) {
+      return 'effect';
+    }
+
+    if (t.isBlockStatement(node.body)) {
+      return 'getter';
+    }
+
+    return stringifyReactiveSource(node.body);
+  }
+
+  if (t.isIdentifier(node)) {
+    return node.name;
+  }
+
+  if (t.isStringLiteral(node)) {
+    return `'${node.value}'`;
+  }
+
+  if (t.isNumericLiteral(node) || t.isBigIntLiteral(node)) {
+    return String(node.value);
+  }
+
+  if (node.type === 'BooleanLiteral') {
+    return node.value ? 'true' : 'false';
+  }
+
+  if (t.isTemplateLiteral(node)) {
+    return node.expressions.length === 0 ? `\`${node.quasis[0]?.value.cooked || ''}\`` : 'template';
+  }
+
+  if (t.isArrayExpression(node)) {
+    const members = node.elements
+      .map((element) => stringifyReactiveSource(element))
+      .filter((value): value is string => Boolean(value));
+
+    return members.length > 0 ? `[${members.join(', ')}]` : '[]';
+  }
+
+  if (t.isMemberExpression(node) && !node.computed) {
+    const objectName = stringifyReactiveSource(node.object);
+    const propertyName = t.isIdentifier(node.property) ? node.property.name : undefined;
+
+    return objectName && propertyName ? `${objectName}.${propertyName}` : undefined;
+  }
+
+  if (t.isOptionalMemberExpression(node) && !node.computed) {
+    const objectName = stringifyReactiveSource(node.object);
+    const propertyName = t.isIdentifier(node.property) ? node.property.name : undefined;
+
+    return objectName && propertyName ? `${objectName}?.${propertyName}` : undefined;
+  }
+
+  if (t.isCallExpression(node)) {
+    const calleeName = getCalleeName(node.callee);
+    return calleeName ? `${calleeName}(...)` : 'call';
+  }
+
+  return undefined;
 }
 
 function extractTypeEntries(types: readonly t.TSType[], knownTypes: Map<string, t.TSType>, fallbackPrefix: string) {
@@ -842,7 +931,8 @@ function createEmptyScriptAnalysis(): ScriptAnalysis {
     exposed: new Set<string>(),
     refs: new Set<string>(),
     computed: new Set<string>(),
-    watchers: new Set<string>(),
+    watchers: [],
+    watcherDetails: [],
     methods: new Set<string>(),
     warnings: []
   };
@@ -863,6 +953,17 @@ function sortDetailedValues(values: readonly string[], details: Map<string, stri
       type: details.get(name)
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function sortAnalysisDetailItems(values: readonly AnalysisDetailItem[]) {
+  return [...values].sort((left, right) => {
+    const nameOrder = left.name.localeCompare(right.name);
+    if (nameOrder !== 0) {
+      return nameOrder;
+    }
+
+    return (left.type || '').localeCompare(right.type || '');
+  });
 }
 
 function toDetailItems(values: readonly string[]): AnalysisDetailItem[] {

@@ -10,7 +10,7 @@ VS Code extension for inspecting the external contract and complexity profile of
 - Analysis webview with grouped signals and badge classification
 - Sidebar tree view under `Vue Analyzer`
 - File badges for common component profiles
-- Detail dialogs for props, slots, emits, stores, injects, provides, exposed members, and slot props
+- Detail dialogs for props, slots, emits, stores, injects, provides, exposed members, slot props, refs, computed values, and watchers
 - Cached analysis refreshed on open, save, and file watcher events
 
 ## Signals
@@ -18,6 +18,7 @@ VS Code extension for inspecting the external contract and complexity profile of
 - Inputs: props, `v-model`, slots
 - Injected dependencies: inject usage
 - Stores: detected store references
+- Reactivity: refs, computed values, and watcher usage
 - Outputs: emits, exposed members, slot props
 - Provides: provided dependencies
 - Score: total complexity per file
@@ -51,7 +52,7 @@ Open category dialogs from the webview for exact contract items.
 2. Click the editor title badge or run `Vue Analyzer: Show Complexity`.
 3. Review the visual analysis panel.
 4. Open the `Vue Analyzer` sidebar to compare other components.
-5. Click a metric to inspect the exact items detected in that category.
+5. Click a metric to inspect the exact items detected in that category, including internal reactivity signals.
 
 ## Limitations
 

@@ -223,12 +223,12 @@ h2 {
   grid-row: 2;
   z-index: 1;
   padding: 26px 22px;
-  text-align: center;
   min-width: 0;
 }
 
 .component-node h2 {
   max-width: 100%;
+  text-align: center;
 }
 
 .cluster.outputs {
@@ -259,6 +259,33 @@ h2 {
 .metric-list {
   display: grid;
   gap: 10px;
+}
+
+.component-reactivity-label {
+  margin-top: 18px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  text-align: center;
+}
+
+.component-metrics {
+  margin-top: 0;
+}
+
+.component-node .metric-button {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.component-node .metric-button:hover:not(:disabled),
+.component-node .metric-button:focus-visible:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.component-node .metric-value {
+  color: #ffb2c4;
 }
 
 .metric {

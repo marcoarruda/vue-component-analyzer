@@ -22,6 +22,7 @@ export function renderComplexityWebview(
   const storeTotal = analysis.external.stores.length;
   const provideTotal = analysis.external.provides.length;
   const outputTotal = analysis.external.emits.length + analysis.external.exposed.length + analysis.external.slotProps.length;
+  const internalTotal = analysis.internal.refs.length + analysis.internal.computed.length + analysis.internal.watchers.length;
   const badgeGroups = getBadgeGroups(analysis);
   const badgeLabel = getBadgeCombinationLabel(badgeGroups);
   const badgeAssetUri = webview.asWebviewUri(
@@ -62,6 +63,15 @@ export function renderComplexityWebview(
         renderMetric('Slot Props', 'slotProps', detailPayload.slotProps.items)
       ].join('')
     )
+    .replaceAll('{{INTERNAL_TOTAL}}', String(internalTotal))
+    .replaceAll(
+      '{{INTERNAL_METRICS}}',
+      [
+        renderMetric('Ref', 'refs', detailPayload.refs.items),
+        renderMetric('Computed', 'computed', detailPayload.computed.items),
+        renderMetric('Watch', 'watchers', detailPayload.watchers.items)
+      ].join('')
+    )
     .replaceAll('{{PROVIDE_TOTAL}}', String(provideTotal))
     .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provided', 'provides', detailPayload.provides.items))
     .replaceAll('{{ANALYSIS_DETAILS}}', serializeForScript(detailPayload));
@@ -99,6 +109,21 @@ function createDetailPayload(analysis: ComponentAnalysisResult): Record<string, 
       title: 'Stores',
       emptyLabel: 'No stores were detected.',
       items: analysis.details.external.stores
+    },
+    refs: {
+      title: 'Refs',
+      emptyLabel: 'No refs were detected.',
+      items: analysis.details.internal.refs
+    },
+    computed: {
+      title: 'Computed Values',
+      emptyLabel: 'No computed values were detected.',
+      items: analysis.details.internal.computed
+    },
+    watchers: {
+      title: 'Watchers',
+      emptyLabel: 'No watchers were detected.',
+      items: analysis.details.internal.watchers
     },
     emits: {
       title: 'Emits',
