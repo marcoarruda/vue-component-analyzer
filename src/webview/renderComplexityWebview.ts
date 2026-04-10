@@ -12,6 +12,7 @@ export function renderComplexityWebview(
   extensionUri: vscode.Uri,
   analysis: ComponentAnalysisResult
 ) {
+  const scriptNonce = createNonce();
   const inputTotal = analysis.external.props.length + analysis.external.models.length + analysis.external.slots.length;
   const injectTotal = analysis.external.injects.length;
   const storeTotal = analysis.external.stores.length;
@@ -28,7 +29,7 @@ export function renderComplexityWebview(
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${scriptNonce}';" />
     <title>Vue Component Complexity</title>
     <style>
       :root {
@@ -131,6 +132,9 @@ export function renderComplexityWebview(
       h2 {
         font-size: 28px;
         line-height: 1.1;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        hyphens: auto;
       }
 
       .subtitle {
@@ -152,8 +156,9 @@ export function renderComplexityWebview(
         display: grid;
         gap: 6px;
         min-width: 0;
-        top: 0;
-        left: 0;
+        grid-column: 1;
+        grid-row: 1;
+        align-self: start;
         max-width: min(62%, 520px);
         z-index: 2;
       }
@@ -187,8 +192,10 @@ export function renderComplexityWebview(
       }
 
       .network .badge-card {
-        top: 0;
-        right: 0;
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+        align-self: start;
         z-index: 2;
       }
 
@@ -204,6 +211,11 @@ export function renderComplexityWebview(
         stroke-width: 2;
         stroke-linecap: round;
         opacity: 0.84;
+        marker-end: url(#connector-arrow);
+      }
+
+      .connector marker path {
+        fill: context-stroke;
       }
 
       .cluster,
@@ -247,6 +259,11 @@ export function renderComplexityWebview(
         z-index: 1;
         padding: 26px 22px;
         text-align: center;
+        min-width: 0;
+      }
+
+      .component-node h2 {
+        max-width: 100%;
       }
 
       .cluster.outputs {
@@ -326,7 +343,6 @@ export function renderComplexityWebview(
 
         .diagram-header-copy,
         .network .badge-card {
-          position: static;
           max-width: none;
           justify-self: stretch;
         }
@@ -382,27 +398,32 @@ export function renderComplexityWebview(
               <img class="badge-image" src="${badgeAssetUri}" alt="${escapeHtml(badgeLabel)} badge" />
               <div class="badge-value">${escapeHtml(badgeLabel)}</div>
             </aside>
-            <svg class="connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <line x1="18" y1="64" x2="43" y2="64" stroke="var(--inputs)" />
-              <line x1="50" y1="36" x2="50" y2="55" stroke="var(--external-sources)" />
-              <line x1="58" y1="40" x2="53" y2="55" stroke="var(--external-sources-alt)" />
-              <line x1="82" y1="64" x2="57" y2="64" stroke="var(--outputs)" />
-              <line x1="50" y1="92" x2="50" y2="72" stroke="var(--external-sources)" />
+            <svg class="connector" aria-hidden="true">
+              <defs>
+                <marker id="connector-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" />
+                </marker>
+              </defs>
+              <line data-from="inputs" data-to="component" stroke="var(--inputs)" />
+              <line data-from="external-source" data-to="component" stroke="var(--external-sources)" />
+              <line data-from="external-source-store" data-to="component" stroke="var(--external-sources-alt)" />
+              <line data-from="component" data-to="outputs" stroke="var(--outputs)" />
+              <line data-from="component" data-to="external-source-provide" stroke="var(--external-sources)" />
             </svg>
 
-            <section class="cluster external-source">
+            <section class="cluster external-source" data-node="external-source">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${injectTotal}</div>
               <div class="metric-list">${renderMetric('Injected', injectTotal)}</div>
             </section>
 
-            <section class="cluster external-source-store">
+            <section class="cluster external-source-store" data-node="external-source-store">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${storeTotal}</div>
               <div class="metric-list">${renderMetric('Stores', storeTotal)}</div>
             </section>
 
-            <section class="cluster inputs">
+            <section class="cluster inputs" data-node="inputs">
               <div class="cluster-title">Inputs</div>
               <div class="cluster-total">${inputTotal}</div>
               <div class="metric-list">
@@ -412,12 +433,12 @@ export function renderComplexityWebview(
               </div>
             </section>
 
-            <section class="component-node">
+            <section class="component-node" data-node="component">
               <div class="node-title">Component</div>
-              <h2>Core Node</h2>
+              <h2>${escapeHtml(analysis.component.name)}</h2>
             </section>
 
-            <section class="cluster outputs">
+            <section class="cluster outputs" data-node="outputs">
               <div class="cluster-title">Outputs</div>
               <div class="cluster-total">${outputTotal}</div>
               <div class="metric-list">
@@ -427,7 +448,7 @@ export function renderComplexityWebview(
               </div>
             </section>
 
-            <section class="cluster external-source-provide">
+            <section class="cluster external-source-provide" data-node="external-source-provide">
               <div class="cluster-title">External Sources</div>
               <div class="cluster-total">${provideTotal}</div>
               <div class="metric-list">${renderMetric('Provides', provideTotal)}</div>
@@ -436,8 +457,91 @@ export function renderComplexityWebview(
         </article>
       </section>
     </div>
+    <script nonce="${scriptNonce}">
+      const network = document.querySelector('.network');
+      const connector = document.querySelector('.connector');
+
+      function anchorPoint(rect, targetRect) {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const targetCenterX = targetRect.left + targetRect.width / 2;
+        const targetCenterY = targetRect.top + targetRect.height / 2;
+        const deltaX = targetCenterX - centerX;
+        const deltaY = targetCenterY - centerY;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          return {
+            x: deltaX >= 0 ? rect.right : rect.left,
+            y: centerY
+          };
+        }
+
+        return {
+          x: centerX,
+          y: deltaY >= 0 ? rect.bottom : rect.top
+        };
+      }
+
+      function renderConnectors() {
+        if (!network || !connector || window.innerWidth <= 980) {
+          return;
+        }
+
+        const networkRect = network.getBoundingClientRect();
+        connector.setAttribute('viewBox', '0 0 ' + networkRect.width + ' ' + networkRect.height);
+
+        for (const line of connector.querySelectorAll('line')) {
+          const fromKey = line.getAttribute('data-from');
+          const toKey = line.getAttribute('data-to');
+          const fromElement = network.querySelector('[data-node="' + fromKey + '"]');
+          const toElement = network.querySelector('[data-node="' + toKey + '"]');
+
+          if (!fromElement || !toElement) {
+            continue;
+          }
+
+          const fromRect = fromElement.getBoundingClientRect();
+          const toRect = toElement.getBoundingClientRect();
+          const start = anchorPoint(fromRect, toRect);
+          const end = anchorPoint(toRect, fromRect);
+
+          line.setAttribute('x1', String(start.x - networkRect.left));
+          line.setAttribute('y1', String(start.y - networkRect.top));
+          line.setAttribute('x2', String(end.x - networkRect.left));
+          line.setAttribute('y2', String(end.y - networkRect.top));
+        }
+      }
+
+      const resizeObserver = typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            renderConnectors();
+          })
+        : undefined;
+
+      if (resizeObserver) {
+        resizeObserver.observe(document.body);
+        if (network) {
+          resizeObserver.observe(network);
+        }
+      }
+
+      window.addEventListener('resize', renderConnectors);
+      window.addEventListener('load', renderConnectors);
+      renderConnectors();
+    </script>
   </body>
 </html>`;
+}
+
+function createNonce() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let value = '';
+
+  for (let index = 0; index < 32; index += 1) {
+    value += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+
+  return value;
 }
 
 function renderMetric(label: string, count: number) {

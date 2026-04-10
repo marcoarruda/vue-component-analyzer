@@ -165,7 +165,7 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
     `${analysis.component.name} Complexity`,
     targetViewColumn,
     {
-      enableScripts: false,
+      enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [context.extensionUri]
     }
