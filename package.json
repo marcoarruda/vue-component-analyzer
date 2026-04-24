@@ -49,7 +49,10 @@
       {
         "command": "vueComponentAnalyzer.showProjectGraph",
         "title": "Vue Analyzer: Show Project Graph",
-        "icon": "$(graph)"
+        "icon": {
+          "light": "media/project-graph-light.svg",
+          "dark": "media/project-graph-dark.svg"
+        }
       },
       {
         "command": "vueComponentAnalyzer.showComplexity.empty",
@@ -384,6 +387,12 @@
           "id": "vueComponentAnalyzer.components",
           "name": "Vue Components",
           "icon": "media/logo-sidebar.svg"
+        },
+        {
+          "type": "webview",
+          "id": "vueComponentAnalyzer.projectGraph",
+          "name": "Project Graph",
+          "icon": "media/project-graph-dark.svg"
         }
       ]
     }

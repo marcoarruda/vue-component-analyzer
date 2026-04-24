@@ -9,7 +9,8 @@ let projectGraphTemplateCache: string | undefined;
 export function renderProjectGraphWebview(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
-  graph: ProjectGraphResult
+  graph: ProjectGraphResult,
+  layout: 'panel' | 'sidebar' = 'panel'
 ) {
   const template = getProjectGraphTemplate(extensionUri);
   const scriptNonce = createNonce();
@@ -21,6 +22,7 @@ export function renderProjectGraphWebview(
     .replaceAll('{{SCRIPT_NONCE}}', scriptNonce)
     .replaceAll('{{STYLES_URI}}', String(stylesUri))
     .replaceAll('{{SCRIPT_URI}}', String(scriptUri))
+    .replaceAll('{{BODY_CLASS}}', layout === 'sidebar' ? 'graph-layout--sidebar' : '')
     .replaceAll('{{WORKSPACE_NAME}}', escapeHtml(graph.workspaceName))
     .replaceAll('{{FILE_COUNT}}', String(graph.stats.fileCount))
     .replaceAll('{{VUE_FILE_COUNT}}', String(graph.stats.vueFileCount))

@@ -10,6 +10,7 @@ import { renderProjectGraphWebview } from './webview/renderProjectGraphWebview';
 
 let complexityPanel: vscode.WebviewPanel | undefined;
 let projectGraphPanel: vscode.WebviewPanel | undefined;
+let projectGraphSidebarView: vscode.WebviewView | undefined;
 
 const TOPBAR_BADGE_CONTEXT_KEY = 'vueComponentAnalyzer.topbarBadge';
 const COMPONENTS_VIEW_MODE_CONTEXT_KEY = 'vueComponentAnalyzer.componentsViewMode';
@@ -93,6 +94,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
     vscode.window.registerTreeDataProvider('vueComponentAnalyzer.components', analysisTree),
+    vscode.window.registerWebviewViewProvider('vueComponentAnalyzer.projectGraph', {
+      resolveWebviewView(webviewView) {
+        projectGraphSidebarView = webviewView;
+        webviewView.webview.options = {
+          enableScripts: true,
+          localResourceRoots: [context.extensionUri]
+        };
+        webviewView.webview.onDidReceiveMessage((message) => handleProjectGraphWebviewMessage(context, message));
+        void refreshProjectGraphSidebarView(context);
+      }
+    }),
     watcher,
     tsWatcher,
     vscode.commands.registerCommand('vueComponentAnalyzer.toggleTreeDisplayMode', toggleTreeDisplayMode),
@@ -153,9 +165,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
 
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     watcher.onDidCreate(async (uri) => {
       const analysis = await cache.analyzeUri(uri);
@@ -169,9 +179,7 @@ export function activate(context: vscode.ExtensionContext) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
       }
 
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     watcher.onDidChange(async (uri) => {
       const analysis = await cache.analyzeUri(uri);
@@ -186,9 +194,7 @@ export function activate(context: vscode.ExtensionContext) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
       }
 
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     watcher.onDidDelete(async (uri) => {
       cache.delete(uri);
@@ -199,24 +205,16 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('setContext', TOPBAR_BADGE_CONTEXT_KEY, 'analysis-empty');
       }
 
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     tsWatcher.onDidCreate(async () => {
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     tsWatcher.onDidChange(async () => {
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     }),
     tsWatcher.onDidDelete(async () => {
-      if (projectGraphPanel?.visible) {
-        await refreshProjectGraphPanel(context);
-      }
+      await refreshVisibleProjectGraphViews(context);
     })
   );
 
@@ -300,25 +298,32 @@ async function openProjectGraphPanel(context: vscode.ExtensionContext) {
     projectGraphPanel = undefined;
   });
 
-  projectGraphPanel.webview.onDidReceiveMessage(async (message) => {
-    if (!message || typeof message.type !== 'string') {
-      return;
-    }
-
-    if (message.type !== 'openFile' || typeof message.path !== 'string') {
-      return;
-    }
-
-    const candidate = await resolveProjectGraphNodeUri(message.path);
-    if (!candidate) {
-      return;
-    }
-
-    const document = await vscode.workspace.openTextDocument(candidate);
-    await vscode.window.showTextDocument(document, { preview: false });
-  });
+  projectGraphPanel.webview.onDidReceiveMessage((message) => handleProjectGraphWebviewMessage(context, message));
 
   await refreshProjectGraphPanel(context);
+}
+
+async function handleProjectGraphWebviewMessage(context: vscode.ExtensionContext, message: unknown) {
+  if (!message || typeof message !== 'object' || typeof (message as { type?: unknown }).type !== 'string') {
+    return;
+  }
+
+  if ((message as { type: string }).type === 'openGraphPanel') {
+    await openProjectGraphPanel(context);
+    return;
+  }
+
+  if ((message as { type: string }).type !== 'openFile' || typeof (message as { path?: unknown }).path !== 'string') {
+    return;
+  }
+
+  const candidate = await resolveProjectGraphNodeUri((message as { path: string }).path);
+  if (!candidate) {
+    return;
+  }
+
+  const document = await vscode.workspace.openTextDocument(candidate);
+  await vscode.window.showTextDocument(document, { preview: false });
 }
 
 async function resolveProjectGraphNodeUri(graphPath: string) {
@@ -353,7 +358,32 @@ async function refreshProjectGraphPanel(context: vscode.ExtensionContext) {
 
   const graph = await buildWorkspaceProjectGraph();
   projectGraphPanel.title = `${graph.workspaceName} Graph`;
-  projectGraphPanel.webview.html = renderProjectGraphWebview(projectGraphPanel.webview, context.extensionUri, graph);
+  projectGraphPanel.webview.html = renderProjectGraphWebview(projectGraphPanel.webview, context.extensionUri, graph, 'panel');
+}
+
+async function refreshProjectGraphSidebarView(context: vscode.ExtensionContext) {
+  if (!projectGraphSidebarView) {
+    return;
+  }
+
+  const graph = await buildWorkspaceProjectGraph();
+  projectGraphSidebarView.title = 'Project Graph';
+  projectGraphSidebarView.description = graph.workspaceName;
+  projectGraphSidebarView.webview.html = renderProjectGraphWebview(projectGraphSidebarView.webview, context.extensionUri, graph, 'sidebar');
+}
+
+async function refreshVisibleProjectGraphViews(context: vscode.ExtensionContext) {
+  const refreshes: Array<Promise<void>> = [];
+
+  if (projectGraphPanel?.visible) {
+    refreshes.push(refreshProjectGraphPanel(context));
+  }
+
+  if (projectGraphSidebarView?.visible) {
+    refreshes.push(refreshProjectGraphSidebarView(context));
+  }
+
+  await Promise.all(refreshes);
 }
 
 async function primeWorkspaceVueFiles(

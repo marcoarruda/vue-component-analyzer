@@ -7,6 +7,7 @@ const labelsToggle = document.getElementById('labels-toggle');
 const zoomOutButton = document.getElementById('zoom-out-button');
 const zoomResetButton = document.getElementById('zoom-reset-button');
 const zoomInButton = document.getElementById('zoom-in-button');
+const openGraphPanelButton = document.getElementById('open-graph-panel-button');
 
 const graph = parsePayload(graphPayloadElement);
 const currentPositions = new Map();
@@ -665,6 +666,12 @@ if (zoomResetButton) {
 if (zoomInButton) {
   zoomInButton.addEventListener('click', () => {
     setZoom(viewportState.scale * 1.1);
+  });
+}
+
+if (openGraphPanelButton) {
+  openGraphPanelButton.addEventListener('click', () => {
+    vscode?.postMessage({ type: 'openGraphPanel' });
   });
 }
 

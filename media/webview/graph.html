@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{STYLES_URI}}" />
     <title>Vue Analyzer Project Graph</title>
   </head>
-  <body>
+  <body class="{{BODY_CLASS}}">
     <div class="shell">
       <section class="hero panel">
         <div>
@@ -56,6 +56,10 @@
           <svg id="graph-canvas" class="graph-canvas" aria-label="Project dependency graph"></svg>
           <div id="empty-state" class="empty-state" hidden>No Vue or TypeScript relations were found in this workspace.</div>
         </div>
+      </section>
+
+      <section class="panel graph-launch-panel">
+        <button id="open-graph-panel-button" class="graph-launch-button" type="button">Open Full Project Graph</button>
       </section>
 
       <section class="panel legend-panel">
