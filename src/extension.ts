@@ -3,10 +3,13 @@ import * as vscode from 'vscode';
 import { AnalysisCache } from './extension/analysisCache';
 import { VueAnalysisTreeProvider } from './extension/componentAnalysisTreeProvider';
 import { VueComplexityDecorationProvider } from './extension/fileDecorationProvider';
+import { buildWorkspaceProjectGraph } from './extension/projectGraphService';
 import { getBadgeAssetName, getBadgeGroups, type ComponentAnalysisResult } from './types/analysis';
 import { renderComplexityWebview } from './webview/renderComplexityWebview';
+import { renderProjectGraphWebview } from './webview/renderProjectGraphWebview';
 
-let panel: vscode.WebviewPanel | undefined;
+let complexityPanel: vscode.WebviewPanel | undefined;
+let projectGraphPanel: vscode.WebviewPanel | undefined;
 
 const TOPBAR_BADGE_CONTEXT_KEY = 'vueComponentAnalyzer.topbarBadge';
 const COMPONENTS_VIEW_MODE_CONTEXT_KEY = 'vueComponentAnalyzer.componentsViewMode';
@@ -35,6 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
   const decorations = new VueComplexityDecorationProvider(cache);
   const analysisTree = new VueAnalysisTreeProvider(cache, context.extensionUri);
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.vue');
+  const tsWatcher = vscode.workspace.createFileSystemWatcher('**/*.ts');
   const toggleTreeDisplayMode = async () => {
     const configuration = vscode.workspace.getConfiguration('vueComponentAnalyzer');
     const currentMode = configuration.get<'list' | 'folders'>('components.viewMode', 'list');
@@ -82,15 +86,20 @@ export function activate(context: vscode.ExtensionContext) {
     decorations.refresh(editor.document.uri);
     await updateTopbarBadgeContext(cache, editor);
   };
+  const showProjectGraph = async () => {
+    await openProjectGraphPanel(context);
+  };
 
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
     vscode.window.registerTreeDataProvider('vueComponentAnalyzer.components', analysisTree),
     watcher,
+    tsWatcher,
     vscode.commands.registerCommand('vueComponentAnalyzer.toggleTreeDisplayMode', toggleTreeDisplayMode),
     vscode.commands.registerCommand('vueComponentAnalyzer.switchToFolderTreeDisplayMode', toggleTreeDisplayMode),
     vscode.commands.registerCommand('vueComponentAnalyzer.switchToListTreeDisplayMode', toggleTreeDisplayMode),
     vscode.commands.registerCommand('vueComponentAnalyzer.setListSortMode', pickListSortMode),
+    vscode.commands.registerCommand('vueComponentAnalyzer.showProjectGraph', showProjectGraph),
     ...SHOW_COMPLEXITY_COMMAND_IDS.map((commandId) => vscode.commands.registerCommand(commandId, showComplexity)),
     vscode.workspace.onDidChangeConfiguration(async (event) => {
       if (event.affectsConfiguration('vueComponentAnalyzer.components.viewMode') || event.affectsConfiguration('vueComponentAnalyzer.components.listSortBy')) {
@@ -126,45 +135,59 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
     vscode.workspace.onDidSaveTextDocument(async (document) => {
-      if (!isVueDocument(document)) {
+      if (!isGraphDocument(document)) {
         return;
       }
 
-      const analysis = cache.recompute(document);
-      if (panel && panel.visible) {
-        panel.title = `${analysis.component.name} Complexity`;
-        panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
-      }
-      decorations.refresh(document.uri);
-      analysisTree.refresh();
+      if (isVueDocument(document)) {
+        const analysis = cache.recompute(document);
+        if (complexityPanel && complexityPanel.visible) {
+          complexityPanel.title = `${analysis.component.name} Complexity`;
+          complexityPanel.webview.html = renderComplexityWebview(complexityPanel.webview, context.extensionUri, analysis);
+        }
+        decorations.refresh(document.uri);
+        analysisTree.refresh();
 
-      if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) {
-        await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
+        if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) {
+          await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
+        }
+      }
+
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
       }
     }),
     watcher.onDidCreate(async (uri) => {
       const analysis = await cache.analyzeUri(uri);
-      if (panel && panel.visible) {
-        panel.title = `${analysis.component.name} Complexity`;
+      if (complexityPanel && complexityPanel.visible) {
+        complexityPanel.title = `${analysis.component.name} Complexity`;
       }
       decorations.refresh(uri);
       analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
+      }
+
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
       }
     }),
     watcher.onDidChange(async (uri) => {
       const analysis = await cache.analyzeUri(uri);
-      if (panel && panel.visible) {
-        panel.title = `${analysis.component.name} Complexity`;
-        panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
+      if (complexityPanel && complexityPanel.visible) {
+        complexityPanel.title = `${analysis.component.name} Complexity`;
+        complexityPanel.webview.html = renderComplexityWebview(complexityPanel.webview, context.extensionUri, analysis);
       }
       decorations.refresh(uri);
       analysisTree.refresh();
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await updateTopbarBadgeContext(cache, vscode.window.activeTextEditor);
+      }
+
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
       }
     }),
     watcher.onDidDelete(async (uri) => {
@@ -174,6 +197,25 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (vscode.window.activeTextEditor?.document.uri.toString() === uri.toString()) {
         await vscode.commands.executeCommand('setContext', TOPBAR_BADGE_CONTEXT_KEY, 'analysis-empty');
+      }
+
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
+      }
+    }),
+    tsWatcher.onDidCreate(async () => {
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
+      }
+    }),
+    tsWatcher.onDidChange(async () => {
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
+      }
+    }),
+    tsWatcher.onDidDelete(async () => {
+      if (projectGraphPanel?.visible) {
+        await refreshProjectGraphPanel(context);
       }
     })
   );
@@ -202,17 +244,21 @@ function isVueDocument(document: vscode.TextDocument) {
   return document.uri.scheme === 'file' && document.uri.fsPath.endsWith('.vue');
 }
 
+function isGraphDocument(document: vscode.TextDocument) {
+  return document.uri.scheme === 'file' && (document.uri.fsPath.endsWith('.vue') || document.uri.fsPath.endsWith('.ts'));
+}
+
 function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited<ReturnType<AnalysisCache['getOrAnalyze']>>) {
   const targetViewColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
 
-  if (panel) {
-    panel.reveal(targetViewColumn);
-    panel.title = `${analysis.component.name} Complexity`;
-    panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
+  if (complexityPanel) {
+    complexityPanel.reveal(targetViewColumn);
+    complexityPanel.title = `${analysis.component.name} Complexity`;
+    complexityPanel.webview.html = renderComplexityWebview(complexityPanel.webview, context.extensionUri, analysis);
     return;
   }
 
-  panel = vscode.window.createWebviewPanel(
+  complexityPanel = vscode.window.createWebviewPanel(
     'vueComponentAnalyzer.complexity',
     `${analysis.component.name} Complexity`,
     targetViewColumn,
@@ -223,11 +269,62 @@ function openComplexityPanel(context: vscode.ExtensionContext, analysis: Awaited
     }
   );
 
-  panel.onDidDispose(() => {
-    panel = undefined;
+  complexityPanel.onDidDispose(() => {
+    complexityPanel = undefined;
   });
 
-  panel.webview.html = renderComplexityWebview(panel.webview, context.extensionUri, analysis);
+  complexityPanel.webview.html = renderComplexityWebview(complexityPanel.webview, context.extensionUri, analysis);
+}
+
+async function openProjectGraphPanel(context: vscode.ExtensionContext) {
+  const targetViewColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
+
+  if (projectGraphPanel) {
+    projectGraphPanel.reveal(targetViewColumn);
+    await refreshProjectGraphPanel(context);
+    return;
+  }
+
+  projectGraphPanel = vscode.window.createWebviewPanel(
+    'vueComponentAnalyzer.projectGraph',
+    'Workspace Graph',
+    targetViewColumn,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [context.extensionUri]
+    }
+  );
+
+  projectGraphPanel.onDidDispose(() => {
+    projectGraphPanel = undefined;
+  });
+
+  projectGraphPanel.webview.onDidReceiveMessage(async (message) => {
+    if (!message || message.type !== 'openFile' || typeof message.path !== 'string') {
+      return;
+    }
+
+    const [candidate] = await vscode.workspace.findFiles(message.path, undefined, 1);
+    if (!candidate) {
+      return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(candidate);
+    await vscode.window.showTextDocument(document, { preview: false });
+  });
+
+  await refreshProjectGraphPanel(context);
+}
+
+async function refreshProjectGraphPanel(context: vscode.ExtensionContext) {
+  if (!projectGraphPanel) {
+    return;
+  }
+
+  const graph = await buildWorkspaceProjectGraph();
+  projectGraphPanel.title = `${graph.workspaceName} Graph`;
+  projectGraphPanel.webview.html = renderProjectGraphWebview(projectGraphPanel.webview, context.extensionUri, graph);
 }
 
 async function primeWorkspaceVueFiles(

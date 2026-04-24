@@ -47,6 +47,11 @@
         }
       },
       {
+        "command": "vueComponentAnalyzer.showProjectGraph",
+        "title": "Vue Analyzer: Show Project Graph",
+        "icon": "$(graph)"
+      },
+      {
         "command": "vueComponentAnalyzer.showComplexity.empty",
         "title": "Vue Analyzer: Show Complexity",
         "icon": {
@@ -339,6 +344,11 @@
           "command": "vueComponentAnalyzer.setListSortMode",
           "when": "view == vueComponentAnalyzer.components && config.vueComponentAnalyzer.components.viewMode == list",
           "group": "navigation@2"
+        },
+        {
+          "command": "vueComponentAnalyzer.showProjectGraph",
+          "when": "view == vueComponentAnalyzer.components",
+          "group": "navigation@3"
         }
       ]
     },
@@ -389,7 +399,6 @@
     "@types/node": "^24.0.0",
     "@types/vscode": "^1.100.0",
     "esbuild": "^0.25.0",
-    "typescript": "^5.8.0",
     "vsce": "^2.15.0"
   },
   "repository": {
@@ -401,6 +410,7 @@
     "@babel/traverse": "^7.29.0",
     "@babel/types": "^7.29.0",
     "@vue/compiler-dom": "^3.5.32",
-    "@vue/compiler-sfc": "^3.5.32"
+    "@vue/compiler-sfc": "^3.5.32",
+    "typescript": "^5.8.0"
   }
 }

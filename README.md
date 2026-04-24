@@ -8,6 +8,7 @@ VS Code extension for inspecting the external contract and complexity profile of
 
 - Editor title action for `.vue` files
 - Analysis webview with grouped signals and badge classification
+- Workspace graph webview for Vue and TypeScript file relations
 - Sidebar tree view under `Vue Analyzer`
 - File badges for common component profiles
 - Detail dialogs for props, slots, emits, stores, injects, provides, exposed members, slot props, refs, computed values, and watchers
@@ -55,7 +56,13 @@ When `List` mode is active, you can sort the sidebar by:
 
 ![Vue Analyzer tree view](media/docs-002.png)
 
-### 3. Drill into exact details
+### 3. Visualize file relations
+
+Run `Vue Analyzer: Show Project Graph` from the command palette or the sidebar title actions.
+
+The graph renders workspace `.vue` and `.ts` files as nodes and draws edges for detected relative `import`, `export ... from`, `import()`, and `require()` relations.
+
+### 4. Drill into exact details
 
 Open category dialogs from the webview for exact contract items.
 
@@ -66,8 +73,9 @@ Open category dialogs from the webview for exact contract items.
 1. Open a `.vue` file.
 2. Click the editor title badge or run `Vue Analyzer: Show Complexity`.
 3. Review the visual analysis panel.
-4. Open the `Vue Analyzer` sidebar to compare other components.
-5. Click a metric to inspect the exact items detected in that category, including internal reactivity signals.
+4. Run `Vue Analyzer: Show Project Graph` to inspect file-level relations across the workspace.
+5. Open the `Vue Analyzer` sidebar to compare other components.
+6. Click a metric to inspect the exact items detected in that category, including internal reactivity signals.
 
 ## Limitations
 

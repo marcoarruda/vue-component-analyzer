@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP_SOURCE}}; script-src 'nonce-{{SCRIPT_NONCE}}' {{CSP_SOURCE}};" />
+    <link rel="stylesheet" href="{{STYLES_URI}}" />
+    <title>Vue Analyzer Project Graph</title>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero panel">
+        <div>
+          <div class="eyebrow">Workspace Graph</div>
+          <h1>{{WORKSPACE_NAME}}</h1>
+          <p class="subtitle">Vue and TypeScript files are rendered as nodes. Relative imports and requires are shown as directional edges.</p>
+        </div>
+        <div class="stats">
+          <article class="stat-card">
+            <div class="stat-label">Files</div>
+            <div class="stat-value">{{FILE_COUNT}}</div>
+          </article>
+          <article class="stat-card stat-card--vue">
+            <div class="stat-label">Vue</div>
+            <div class="stat-value">{{VUE_FILE_COUNT}}</div>
+          </article>
+          <article class="stat-card stat-card--ts">
+            <div class="stat-label">TypeScript</div>
+            <div class="stat-value">{{TS_FILE_COUNT}}</div>
+          </article>
+          <article class="stat-card stat-card--edge">
+            <div class="stat-label">Edges</div>
+            <div class="stat-value">{{EDGE_COUNT}}</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel controls-panel">
+        <label class="toggle">
+          <input id="isolated-toggle" type="checkbox" checked />
+          <span>Hide isolated files</span>
+        </label>
+        <label class="toggle">
+          <input id="labels-toggle" type="checkbox" checked />
+          <span>Show labels</span>
+        </label>
+      </section>
+
+      <section class="panel graph-panel">
+        <div class="graph-stage">
+          <svg id="graph-canvas" class="graph-canvas" aria-label="Project dependency graph"></svg>
+          <div id="empty-state" class="empty-state" hidden>No Vue or TypeScript relations were found in this workspace.</div>
+        </div>
+        <aside class="details-panel">
+          <div class="eyebrow">Selection</div>
+          <h2 id="details-title">Select a file</h2>
+          <p id="details-path" class="details-path">Click a node to inspect its relation counts and open the file.</p>
+          <dl class="detail-stats">
+            <div>
+              <dt>Type</dt>
+              <dd id="details-kind">-</dd>
+            </div>
+            <div>
+              <dt>Outgoing</dt>
+              <dd id="details-outgoing">-</dd>
+            </div>
+            <div>
+              <dt>Incoming</dt>
+              <dd id="details-incoming">-</dd>
+            </div>
+          </dl>
+          <button id="open-file-button" class="open-file-button" type="button" disabled>Open File</button>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-swatch legend-swatch--vue"></span>Vue file</div>
+            <div class="legend-item"><span class="legend-swatch legend-swatch--ts"></span>TypeScript file</div>
+            <div class="legend-item"><span class="legend-line legend-line--import"></span>Static import/export</div>
+            <div class="legend-item"><span class="legend-line legend-line--dynamic"></span>Dynamic import/require</div>
+          </div>
+        </aside>
+      </section>
+    </div>
+
+    <script id="graph-payload" type="application/json">{{GRAPH_PAYLOAD}}</script>
+    <script nonce="{{SCRIPT_NONCE}}" src="{{SCRIPT_URI}}"></script>
+  </body>
+</html>
