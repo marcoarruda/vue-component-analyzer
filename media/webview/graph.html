@@ -44,6 +44,17 @@
           <input id="labels-toggle" type="checkbox" checked />
           <span>Show labels</span>
         </label>
+        <div class="zoom-controls" aria-label="Graph zoom controls">
+          <button id="zoom-out-button" class="zoom-button" type="button">-</button>
+          <button id="zoom-reset-button" class="zoom-button zoom-button--reset" type="button">Reset</button>
+          <button id="zoom-in-button" class="zoom-button" type="button">+</button>
+        </div>
+        <div class="legend legend--compact">
+          <div class="legend-item"><span class="legend-swatch legend-swatch--vue"></span>Vue file</div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch--ts"></span>TypeScript file</div>
+          <div class="legend-item"><span class="legend-line legend-line--import"></span>Static import/export</div>
+          <div class="legend-item"><span class="legend-line legend-line--dynamic"></span>Dynamic import/require</div>
+        </div>
       </section>
 
       <section class="panel graph-panel">
@@ -51,32 +62,6 @@
           <svg id="graph-canvas" class="graph-canvas" aria-label="Project dependency graph"></svg>
           <div id="empty-state" class="empty-state" hidden>No Vue or TypeScript relations were found in this workspace.</div>
         </div>
-        <aside class="details-panel">
-          <div class="eyebrow">Selection</div>
-          <h2 id="details-title">Select a file</h2>
-          <p id="details-path" class="details-path">Click a node to inspect its relation counts and open the file.</p>
-          <dl class="detail-stats">
-            <div>
-              <dt>Type</dt>
-              <dd id="details-kind">-</dd>
-            </div>
-            <div>
-              <dt>Outgoing</dt>
-              <dd id="details-outgoing">-</dd>
-            </div>
-            <div>
-              <dt>Incoming</dt>
-              <dd id="details-incoming">-</dd>
-            </div>
-          </dl>
-          <button id="open-file-button" class="open-file-button" type="button" disabled>Open File</button>
-          <div class="legend">
-            <div class="legend-item"><span class="legend-swatch legend-swatch--vue"></span>Vue file</div>
-            <div class="legend-item"><span class="legend-swatch legend-swatch--ts"></span>TypeScript file</div>
-            <div class="legend-item"><span class="legend-line legend-line--import"></span>Static import/export</div>
-            <div class="legend-item"><span class="legend-line legend-line--dynamic"></span>Dynamic import/require</div>
-          </div>
-        </aside>
       </section>
     </div>
 

@@ -4,19 +4,48 @@ const graphCanvas = document.getElementById('graph-canvas');
 const emptyState = document.getElementById('empty-state');
 const isolatedToggle = document.getElementById('isolated-toggle');
 const labelsToggle = document.getElementById('labels-toggle');
-const detailsTitle = document.getElementById('details-title');
-const detailsPath = document.getElementById('details-path');
-const detailsKind = document.getElementById('details-kind');
-const detailsOutgoing = document.getElementById('details-outgoing');
-const detailsIncoming = document.getElementById('details-incoming');
-const openFileButton = document.getElementById('open-file-button');
+const zoomOutButton = document.getElementById('zoom-out-button');
+const zoomResetButton = document.getElementById('zoom-reset-button');
+const zoomInButton = document.getElementById('zoom-in-button');
 
 const graph = parsePayload(graphPayloadElement);
-let selectedNodeId = null;
+const currentPositions = new Map();
+
 let visibleNodes = [];
 let visibleEdges = [];
+let connectedEdgesByNodeId = new Map();
+let viewportGroup = null;
+let suppressNextClick = false;
+
+const viewportState = {
+  scale: 1,
+  tx: 0,
+  ty: 0
+};
+
+const interactionState = {
+  pointerId: null,
+  mode: null,
+  nodeId: null,
+  startClientX: 0,
+  startClientY: 0,
+  nodeOffsetX: 0,
+  nodeOffsetY: 0,
+  startTx: 0,
+  startTy: 0,
+  moved: false
+};
+
+const MIN_SCALE = 0.35;
+const MAX_SCALE = 4;
+const DRAG_THRESHOLD = 4;
 
 if (graphCanvas) {
+  graphCanvas.addEventListener('pointerdown', handlePointerDown);
+  graphCanvas.addEventListener('pointermove', handlePointerMove);
+  graphCanvas.addEventListener('pointerup', handlePointerUp);
+  graphCanvas.addEventListener('pointercancel', handlePointerUp);
+  graphCanvas.addEventListener('lostpointercapture', resetInteractionState);
   graphCanvas.addEventListener('click', handleGraphClick);
 }
 
@@ -45,9 +74,15 @@ function updateVisibleGraph() {
   const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
   visibleEdges = graph.edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
 
-  if (!visibleNodeIds.has(selectedNodeId)) {
-    selectedNodeId = null;
-    renderDetails(null);
+  connectedEdgesByNodeId = new Map();
+  for (const edge of visibleEdges) {
+    const sourceEdges = connectedEdgesByNodeId.get(edge.source) || [];
+    sourceEdges.push(edge);
+    connectedEdgesByNodeId.set(edge.source, sourceEdges);
+
+    const targetEdges = connectedEdgesByNodeId.get(edge.target) || [];
+    targetEdges.push(edge);
+    connectedEdgesByNodeId.set(edge.target, targetEdges);
   }
 }
 
@@ -90,6 +125,34 @@ function createLayout(nodes, width, height) {
   return positions;
 }
 
+function ensureNodePositions(width, height) {
+  const layoutPositions = createLayout(graph.nodes, width, height);
+
+  for (const node of graph.nodes) {
+    if (!currentPositions.has(node.id)) {
+      currentPositions.set(node.id, layoutPositions.get(node.id));
+    }
+  }
+
+  const knownNodeIds = new Set(graph.nodes.map((node) => node.id));
+  for (const nodeId of currentPositions.keys()) {
+    if (!knownNodeIds.has(nodeId)) {
+      currentPositions.delete(nodeId);
+    }
+  }
+}
+
+function visiblePositions() {
+  const positions = new Map();
+  for (const node of visibleNodes) {
+    const position = currentPositions.get(node.id);
+    if (position) {
+      positions.set(node.id, position);
+    }
+  }
+  return positions;
+}
+
 function radiusForNode(node) {
   return 10 + Math.min(18, (node.importCount + node.importedByCount) * 1.35);
 }
@@ -102,6 +165,7 @@ function renderGraph() {
   updateVisibleGraph();
 
   if (visibleNodes.length === 0) {
+    viewportGroup = null;
     graphCanvas.innerHTML = '';
     graphCanvas.setAttribute('viewBox', '0 0 1200 720');
     if (emptyState) {
@@ -118,27 +182,17 @@ function renderGraph() {
   const height = Math.max(graphCanvas.clientHeight || 720, 520);
   graphCanvas.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
 
-  const positions = createLayout(visibleNodes, width, height);
+  ensureNodePositions(width, height);
+  const positions = visiblePositions();
   const showLabels = Boolean(labelsToggle?.checked);
 
-  graphCanvas.innerHTML = [
-    renderEdges(visibleEdges, positions),
-    renderNodes(visibleNodes, positions, showLabels)
-  ].join('');
+  graphCanvas.innerHTML = '<g id="graph-viewport" class="graph-viewport">'
+    + renderEdges(visibleEdges, positions)
+    + renderNodes(visibleNodes, positions, showLabels)
+    + '</g>';
 
-  syncSelectedNode();
-}
-
-function handleGraphClick(event) {
-  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
-  const nodeId = nodeElement?.getAttribute('data-node-id');
-  if (!nodeId) {
-    return;
-  }
-
-  selectedNodeId = nodeId;
-  renderDetails(visibleNodes.find((node) => node.id === nodeId) || null);
-  syncSelectedNode();
+  viewportGroup = graphCanvas.querySelector('#graph-viewport');
+  applyViewportTransform();
 }
 
 function renderEdges(edges, positions) {
@@ -177,45 +231,277 @@ function renderNodes(nodes, positions, showLabels) {
   }).join('');
 }
 
-function renderDetails(node) {
-  if (!detailsTitle || !detailsPath || !detailsKind || !detailsOutgoing || !detailsIncoming || !openFileButton) {
+function handlePointerDown(event) {
+  if (!graphCanvas || event.button !== 0) {
     return;
   }
 
-  if (!node) {
-    detailsTitle.textContent = 'Select a file';
-    detailsPath.textContent = 'Click a node to inspect its relation counts and open the file.';
-    detailsKind.textContent = '-';
-    detailsOutgoing.textContent = '-';
-    detailsIncoming.textContent = '-';
-    openFileButton.disabled = true;
-    return;
+  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
+  const graphPoint = clientToGraphPoint(event.clientX, event.clientY);
+
+  interactionState.pointerId = event.pointerId;
+  interactionState.mode = nodeElement ? 'node' : 'pan';
+  interactionState.nodeId = nodeElement?.getAttribute('data-node-id') || null;
+  interactionState.startClientX = event.clientX;
+  interactionState.startClientY = event.clientY;
+  interactionState.nodeOffsetX = 0;
+  interactionState.nodeOffsetY = 0;
+  interactionState.startTx = viewportState.tx;
+  interactionState.startTy = viewportState.ty;
+  interactionState.moved = false;
+
+  if (interactionState.nodeId) {
+    const nodePosition = currentPositions.get(interactionState.nodeId);
+    if (nodePosition) {
+      interactionState.nodeOffsetX = graphPoint.x - nodePosition.x;
+      interactionState.nodeOffsetY = graphPoint.y - nodePosition.y;
+    }
   }
 
-  detailsTitle.textContent = node.label;
-  detailsPath.textContent = node.path;
-  detailsKind.textContent = node.kind === 'vue' ? 'Vue file' : 'TypeScript file';
-  detailsOutgoing.textContent = String(node.importCount);
-  detailsIncoming.textContent = String(node.importedByCount);
-  openFileButton.disabled = false;
+  if (interactionState.mode === 'pan') {
+    graphCanvas.classList.add('is-panning');
+  }
+
+  if (interactionState.nodeId) {
+    nodeElement?.classList.add('is-dragging');
+  }
+
+  graphCanvas.setPointerCapture(event.pointerId);
 }
 
-function syncSelectedNode() {
+function handlePointerMove(event) {
+  if (!graphCanvas || interactionState.pointerId !== event.pointerId || !interactionState.mode) {
+    return;
+  }
+
+  const deltaX = event.clientX - interactionState.startClientX;
+  const deltaY = event.clientY - interactionState.startClientY;
+
+  if (!interactionState.moved && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
+    interactionState.moved = true;
+    suppressNextClick = true;
+  }
+
+  if (interactionState.mode === 'pan') {
+    if (!interactionState.moved) {
+      return;
+    }
+
+    viewportState.tx = interactionState.startTx + deltaX * viewBoxScaleX();
+    viewportState.ty = interactionState.startTy + deltaY * viewBoxScaleY();
+    applyViewportTransform();
+    return;
+  }
+
+  if (!interactionState.nodeId || !interactionState.moved) {
+    return;
+  }
+
+  const graphPoint = clientToGraphPoint(event.clientX, event.clientY);
+  const nodePosition = currentPositions.get(interactionState.nodeId);
+  if (!nodePosition) {
+    return;
+  }
+
+  nodePosition.x = graphPoint.x - interactionState.nodeOffsetX;
+  nodePosition.y = graphPoint.y - interactionState.nodeOffsetY;
+  updateNodeDom(interactionState.nodeId);
+  updateConnectedEdgeDom(interactionState.nodeId);
+}
+
+function handlePointerUp(event) {
+  if (!graphCanvas || interactionState.pointerId !== event.pointerId) {
+    return;
+  }
+
+  if (graphCanvas.hasPointerCapture(event.pointerId)) {
+    graphCanvas.releasePointerCapture(event.pointerId);
+  }
+
+  resetInteractionState();
+}
+
+function resetInteractionState() {
   if (!graphCanvas) {
     return;
   }
 
-  for (const nodeElement of graphCanvas.querySelectorAll('.graph-node')) {
-    nodeElement.classList.toggle('is-selected', nodeElement.getAttribute('data-node-id') === selectedNodeId);
+  graphCanvas.classList.remove('is-panning');
+
+  if (interactionState.nodeId) {
+    const nodeElement = graphCanvas.querySelector('[data-node-id="' + escapeHtml(interactionState.nodeId) + '"]');
+    nodeElement?.classList.remove('is-dragging');
   }
 
-  for (const edgeElement of graphCanvas.querySelectorAll('.graph-edge')) {
-    const isConnected = selectedNodeId
-      ? edgeElement instanceof Element
-        && (visibleEdges.some((edge) => edge.id === edgeElement.getAttribute('data-edge-id') && (edge.source === selectedNodeId || edge.target === selectedNodeId)))
-      : false;
-    edgeElement.classList.toggle('is-connected', isConnected);
+  interactionState.pointerId = null;
+  interactionState.mode = null;
+  interactionState.nodeId = null;
+  interactionState.startClientX = 0;
+  interactionState.startClientY = 0;
+  interactionState.nodeOffsetX = 0;
+  interactionState.nodeOffsetY = 0;
+  interactionState.startTx = viewportState.tx;
+  interactionState.startTy = viewportState.ty;
+  interactionState.moved = false;
+}
+
+function handleGraphClick(event) {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
   }
+
+  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
+  const nodeId = nodeElement?.getAttribute('data-node-id');
+  if (!nodeId || !vscode) {
+    return;
+  }
+
+  vscode.postMessage({ type: 'openFile', path: nodeId });
+}
+
+function updateNodeDom(nodeId) {
+  if (!graphCanvas) {
+    return;
+  }
+
+  const node = visibleNodes.find((candidate) => candidate.id === nodeId);
+  const position = currentPositions.get(nodeId);
+  const nodeElement = findGraphElementByDataAttribute('data-node-id', nodeId);
+  if (!node || !position || !nodeElement) {
+    return;
+  }
+
+  const circle = nodeElement.querySelector('circle');
+  if (circle) {
+    circle.setAttribute('cx', position.x.toFixed(2));
+    circle.setAttribute('cy', position.y.toFixed(2));
+  }
+
+  const label = nodeElement.querySelector('.graph-label');
+  if (label) {
+    label.setAttribute('x', position.x.toFixed(2));
+    label.setAttribute('y', (position.y + radiusForNode(node) + 16).toFixed(2));
+  }
+}
+
+function updateConnectedEdgeDom(nodeId) {
+  if (!graphCanvas) {
+    return;
+  }
+
+  const connectedEdges = connectedEdgesByNodeId.get(nodeId) || [];
+  for (const edge of connectedEdges) {
+    const source = currentPositions.get(edge.source);
+    const target = currentPositions.get(edge.target);
+    const edgeElement = findGraphElementByDataAttribute('data-edge-id', edge.id);
+    if (!source || !target || !edgeElement) {
+      continue;
+    }
+
+    edgeElement.setAttribute('x1', source.x.toFixed(2));
+    edgeElement.setAttribute('y1', source.y.toFixed(2));
+    edgeElement.setAttribute('x2', target.x.toFixed(2));
+    edgeElement.setAttribute('y2', target.y.toFixed(2));
+  }
+}
+
+function findGraphElementByDataAttribute(attributeName, attributeValue) {
+  if (!graphCanvas) {
+    return null;
+  }
+
+  for (const element of graphCanvas.querySelectorAll('[' + attributeName + ']')) {
+    if (element.getAttribute(attributeName) === attributeValue) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+function setZoom(nextScale) {
+  const clampedScale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+  const currentCenter = viewportCenterInGraphSpace();
+
+  viewportState.scale = clampedScale;
+  const centerSvgX = currentViewBox().x + currentViewBox().width / 2;
+  const centerSvgY = currentViewBox().y + currentViewBox().height / 2;
+  viewportState.tx = centerSvgX - currentCenter.x * viewportState.scale;
+  viewportState.ty = centerSvgY - currentCenter.y * viewportState.scale;
+  applyViewportTransform();
+}
+
+function viewportCenterInGraphSpace() {
+  const box = currentViewBox();
+  const centerSvgX = box.x + box.width / 2;
+  const centerSvgY = box.y + box.height / 2;
+  return {
+    x: (centerSvgX - viewportState.tx) / viewportState.scale,
+    y: (centerSvgY - viewportState.ty) / viewportState.scale
+  };
+}
+
+function applyViewportTransform() {
+  if (!viewportGroup) {
+    return;
+  }
+
+  viewportGroup.setAttribute(
+    'transform',
+    'matrix(' + viewportState.scale + ' 0 0 ' + viewportState.scale + ' ' + viewportState.tx + ' ' + viewportState.ty + ')'
+  );
+}
+
+function clientToSvgPoint(clientX, clientY) {
+  if (!graphCanvas) {
+    return { x: clientX, y: clientY };
+  }
+
+  const rect = graphCanvas.getBoundingClientRect();
+  const { x, y, width, height } = currentViewBox();
+  return {
+    x: x + ((clientX - rect.left) / rect.width) * width,
+    y: y + ((clientY - rect.top) / rect.height) * height
+  };
+}
+
+function clientToGraphPoint(clientX, clientY) {
+  const svgPoint = clientToSvgPoint(clientX, clientY);
+  return {
+    x: (svgPoint.x - viewportState.tx) / viewportState.scale,
+    y: (svgPoint.y - viewportState.ty) / viewportState.scale
+  };
+}
+
+function currentViewBox() {
+  const rawValue = graphCanvas?.getAttribute('viewBox') || '0 0 1200 720';
+  const [x, y, width, height] = rawValue.split(/\s+/).map(Number);
+  return { x, y, width, height };
+}
+
+function viewBoxScaleX() {
+  if (!graphCanvas) {
+    return 1;
+  }
+
+  const { width } = currentViewBox();
+  const rect = graphCanvas.getBoundingClientRect();
+  return width / (rect.width || width);
+}
+
+function viewBoxScaleY() {
+  if (!graphCanvas) {
+    return 1;
+  }
+
+  const { height } = currentViewBox();
+  const rect = graphCanvas.getBoundingClientRect();
+  return height / (rect.height || height);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function escapeHtml(value) {
@@ -235,13 +521,24 @@ if (labelsToggle) {
   labelsToggle.addEventListener('change', renderGraph);
 }
 
-if (openFileButton) {
-  openFileButton.addEventListener('click', () => {
-    if (!selectedNodeId || !vscode) {
-      return;
-    }
+if (zoomOutButton) {
+  zoomOutButton.addEventListener('click', () => {
+    setZoom(viewportState.scale * 0.9);
+  });
+}
 
-    vscode.postMessage({ type: 'openFile', path: selectedNodeId });
+if (zoomResetButton) {
+  zoomResetButton.addEventListener('click', () => {
+    viewportState.scale = 1;
+    viewportState.tx = 0;
+    viewportState.ty = 0;
+    applyViewportTransform();
+  });
+}
+
+if (zoomInButton) {
+  zoomInButton.addEventListener('click', () => {
+    setZoom(viewportState.scale * 1.1);
   });
 }
 
