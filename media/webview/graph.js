@@ -46,7 +46,6 @@ if (graphCanvas) {
   graphCanvas.addEventListener('pointerup', handlePointerUp);
   graphCanvas.addEventListener('pointercancel', handlePointerUp);
   graphCanvas.addEventListener('lostpointercapture', resetInteractionState);
-  graphCanvas.addEventListener('click', handleGraphClick);
 }
 
 function parsePayload(payloadElement) {
@@ -91,36 +90,165 @@ function createLayout(nodes, width, height) {
     return new Map();
   }
 
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const baseRadius = Math.min(width, height) * 0.34;
-  const ringGap = Math.max(54, Math.min(width, height) * 0.06);
-  const layers = new Map();
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = graph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+  const outgoingByNodeId = new Map();
+  const incomingCountByNodeId = new Map(nodes.map((node) => [node.id, 0]));
 
-  for (const node of nodes) {
-    const depth = node.path.split('/').length - 1;
-    const key = String(depth);
-    const bucket = layers.get(key) || [];
-    bucket.push(node);
-    layers.set(key, bucket);
+  for (const edge of edges) {
+    const outgoing = outgoingByNodeId.get(edge.source) || [];
+    outgoing.push(edge.target);
+    outgoingByNodeId.set(edge.source, outgoing);
+    incomingCountByNodeId.set(edge.target, (incomingCountByNodeId.get(edge.target) || 0) + 1);
+  }
+
+  const preferredPaths = ['src/App.vue', 'src/main.ts'];
+  const preferredPathRank = new Map(preferredPaths.map((path, index) => [path, index]));
+  const levelByNodeId = new Map();
+
+  function compareNodes(left, right) {
+    const preferredRankDelta = (preferredPathRank.get(left.path) ?? Number.MAX_SAFE_INTEGER)
+      - (preferredPathRank.get(right.path) ?? Number.MAX_SAFE_INTEGER);
+    if (preferredRankDelta !== 0) {
+      return preferredRankDelta;
+    }
+
+    const incomingDelta = (incomingCountByNodeId.get(left.id) || 0) - (incomingCountByNodeId.get(right.id) || 0);
+    if (incomingDelta !== 0) {
+      return incomingDelta;
+    }
+
+    const outgoingDelta = (outgoingByNodeId.get(right.id)?.length || 0) - (outgoingByNodeId.get(left.id)?.length || 0);
+    if (outgoingDelta !== 0) {
+      return outgoingDelta;
+    }
+
+    return left.path.localeCompare(right.path);
+  }
+
+  function assignLevelsFromRoots(rootNodes) {
+    const queue = rootNodes.map((node) => ({ nodeId: node.id, level: 0 }));
+
+    for (let index = 0; index < queue.length; index += 1) {
+      const current = queue[index];
+      const knownLevel = levelByNodeId.get(current.nodeId);
+      if (knownLevel !== undefined && knownLevel <= current.level) {
+        continue;
+      }
+
+      levelByNodeId.set(current.nodeId, current.level);
+
+      const targets = [...(outgoingByNodeId.get(current.nodeId) || [])].sort((left, right) => left.localeCompare(right));
+      for (const targetId of targets) {
+        queue.push({ nodeId: targetId, level: current.level + 1 });
+      }
+    }
+  }
+
+  const preferredRoots = nodes
+    .filter((node) => preferredPathRank.has(node.path))
+    .sort(compareNodes);
+  assignLevelsFromRoots(preferredRoots);
+
+  const fallbackRoots = nodes
+    .filter((node) => !levelByNodeId.has(node.id) && (incomingCountByNodeId.get(node.id) || 0) === 0)
+    .sort(compareNodes);
+  assignLevelsFromRoots(fallbackRoots);
+
+  const remainingNodes = nodes
+    .filter((node) => !levelByNodeId.has(node.id))
+    .sort(compareNodes);
+  assignLevelsFromRoots(remainingNodes);
+
+  function pathAfterSrc(node) {
+    return node.path.startsWith('src/') ? node.path.slice(4) : node.path;
+  }
+
+  function classifyNode(node) {
+    if (preferredPathRank.has(node.path)) {
+      return 'root';
+    }
+
+    const normalizedPath = pathAfterSrc(node);
+    if (normalizedPath.startsWith('router/')) {
+      return 'router';
+    }
+    if (normalizedPath.startsWith('stores/')) {
+      return 'store';
+    }
+    if (normalizedPath.startsWith('services/')) {
+      return 'service';
+    }
+
+    return 'other';
   }
 
   const positions = new Map();
-  const orderedLayers = Array.from(layers.entries()).sort((left, right) => Number(left[0]) - Number(right[0]));
+  const topPadding = 90;
+  const bottomPadding = 90;
+  const leftPadding = 90;
+  const rightPadding = 90;
+  const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
+  const availableWidth = Math.max(width - leftPadding - rightPadding, 1);
+  const groupedNodes = {
+    root: nodes.filter((node) => classifyNode(node) === 'root').sort(compareNodes),
+    router: nodes.filter((node) => classifyNode(node) === 'router').sort(compareNodes),
+    service: nodes.filter((node) => classifyNode(node) === 'service').sort(compareNodes),
+    store: nodes.filter((node) => classifyNode(node) === 'store').sort(compareNodes),
+    other: nodes.filter((node) => classifyNode(node) === 'other').sort((left, right) => {
+      const levelDelta = (levelByNodeId.get(left.id) || 0) - (levelByNodeId.get(right.id) || 0);
+      if (levelDelta !== 0) {
+        return levelDelta;
+      }
+      return compareNodes(left, right);
+    })
+  };
 
-  orderedLayers.forEach(([depth, layerNodes], layerIndex) => {
-    layerNodes.sort((left, right) => left.path.localeCompare(right.path));
-    const radius = baseRadius + layerIndex * ringGap;
+  const otherLevels = groupedNodes.other.map((node) => levelByNodeId.get(node.id) || 0);
+  const maxOtherLevel = otherLevels.length > 0 ? Math.max(...otherLevels) : 0;
+  const otherRowCount = Math.max(1, maxOtherLevel + 1);
+  const rowCount = 3 + otherRowCount;
+  const rowGap = rowCount > 1 ? availableHeight / (rowCount - 1) : 0;
 
-    layerNodes.forEach((node, nodeIndex) => {
-      const angle = ((Math.PI * 2) / layerNodes.length) * nodeIndex - Math.PI / 2;
+  function placeNodesHorizontally(bucketNodes, rowIndex, startX, laneWidth) {
+    if (bucketNodes.length === 0) {
+      return;
+    }
+
+    const y = topPadding + rowGap * rowIndex;
+    const innerWidth = Math.max(laneWidth, 1);
+    const gap = bucketNodes.length > 1 ? innerWidth / (bucketNodes.length - 1) : 0;
+
+    bucketNodes.forEach((node, nodeIndex) => {
+      const x = bucketNodes.length === 1
+        ? startX + innerWidth / 2
+        : startX + gap * nodeIndex;
+
       positions.set(node.id, {
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius,
-        depth: Number(depth)
+        x,
+        y,
+        depth: rowIndex
       });
     });
-  });
+  }
+
+  placeNodesHorizontally(groupedNodes.root, 0, width * 0.3, width * 0.4);
+  placeNodesHorizontally(groupedNodes.router, 1, width * 0.28, width * 0.44);
+  placeNodesHorizontally(groupedNodes.service, 2, leftPadding, availableWidth * 0.34);
+  placeNodesHorizontally(groupedNodes.store, 2, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
+
+  const otherRows = new Map();
+  for (const node of groupedNodes.other) {
+    const inferredLevel = levelByNodeId.get(node.id) || 0;
+    const rowIndex = 3 + Math.max(0, inferredLevel);
+    const bucket = otherRows.get(rowIndex) || [];
+    bucket.push(node);
+    otherRows.set(rowIndex, bucket);
+  }
+
+  for (const [rowIndex, rowNodes] of Array.from(otherRows.entries()).sort((left, right) => left[0] - right[0])) {
+    placeNodesHorizontally(rowNodes, rowIndex, leftPadding, availableWidth);
+  }
 
   return positions;
 }
@@ -224,7 +352,7 @@ function renderNodes(nodes, positions, showLabels) {
       ? '<text class="graph-label" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(node.label) + '</text>'
       : '';
 
-    return '<g class="graph-node graph-node--' + node.kind + '" data-node-id="' + escapeHtml(node.id) + '">'
+    return '<g class="graph-node graph-node--' + node.color + '" data-node-id="' + escapeHtml(node.id) + '">'
       + '<circle cx="' + position.x.toFixed(2) + '" cy="' + position.y.toFixed(2) + '" r="' + radius.toFixed(2) + '"></circle>'
       + label
       + '</g>';
@@ -314,23 +442,28 @@ function handlePointerUp(event) {
     return;
   }
 
+  const shouldOpenNode = interactionState.mode === 'node' && !interactionState.moved;
+  const nodeId = interactionState.nodeId;
+
   if (graphCanvas.hasPointerCapture(event.pointerId)) {
     graphCanvas.releasePointerCapture(event.pointerId);
   }
 
   resetInteractionState();
+
+  if (shouldOpenNode && nodeId) {
+    openNodeFile(nodeId);
+  }
 }
 
 function resetInteractionState() {
-  if (!graphCanvas) {
-    return;
-  }
+  if (graphCanvas) {
+    graphCanvas.classList.remove('is-panning');
 
-  graphCanvas.classList.remove('is-panning');
-
-  if (interactionState.nodeId) {
-    const nodeElement = graphCanvas.querySelector('[data-node-id="' + escapeHtml(interactionState.nodeId) + '"]');
-    nodeElement?.classList.remove('is-dragging');
+    if (interactionState.nodeId) {
+      const nodeElement = findGraphElementByDataAttribute('data-node-id', interactionState.nodeId);
+      nodeElement?.classList.remove('is-dragging');
+    }
   }
 
   interactionState.pointerId = null;
@@ -345,14 +478,7 @@ function resetInteractionState() {
   interactionState.moved = false;
 }
 
-function handleGraphClick(event) {
-  if (suppressNextClick) {
-    suppressNextClick = false;
-    return;
-  }
-
-  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
-  const nodeId = nodeElement?.getAttribute('data-node-id');
+function openNodeFile(nodeId) {
   if (!nodeId || !vscode) {
     return;
   }

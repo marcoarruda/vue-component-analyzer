@@ -301,11 +301,15 @@ async function openProjectGraphPanel(context: vscode.ExtensionContext) {
   });
 
   projectGraphPanel.webview.onDidReceiveMessage(async (message) => {
-    if (!message || message.type !== 'openFile' || typeof message.path !== 'string') {
+    if (!message || typeof message.type !== 'string') {
       return;
     }
 
-    const [candidate] = await vscode.workspace.findFiles(message.path, undefined, 1);
+    if (message.type !== 'openFile' || typeof message.path !== 'string') {
+      return;
+    }
+
+    const candidate = await resolveProjectGraphNodeUri(message.path);
     if (!candidate) {
       return;
     }
@@ -315,6 +319,31 @@ async function openProjectGraphPanel(context: vscode.ExtensionContext) {
   });
 
   await refreshProjectGraphPanel(context);
+}
+
+async function resolveProjectGraphNodeUri(graphPath: string) {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.length) {
+    return undefined;
+  }
+
+  const normalizedGraphPath = graphPath.replaceAll('\\', '/').replace(/^\/+/, '');
+
+  for (const workspaceFolder of workspaceFolders) {
+    const candidate = vscode.Uri.joinPath(workspaceFolder.uri, ...normalizedGraphPath.split('/').filter(Boolean));
+
+    try {
+      const stat = await vscode.workspace.fs.stat(candidate);
+      if (stat.type === vscode.FileType.File) {
+        return candidate;
+      }
+    } catch {
+      // Try the next workspace folder.
+    }
+  }
+
+  const [fallbackCandidate] = await vscode.workspace.findFiles(normalizedGraphPath, undefined, 1);
+  return fallbackCandidate;
 }
 
 async function refreshProjectGraphPanel(context: vscode.ExtensionContext) {

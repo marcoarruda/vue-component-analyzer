@@ -4,7 +4,7 @@ import * as ts from 'typescript';
 import * as vscode from 'vscode';
 import { parse as parseSfc } from '@vue/compiler-sfc';
 
-import type { ProjectGraphEdge, ProjectGraphEdgeKind, ProjectGraphFileKind, ProjectGraphNode, ProjectGraphResult } from '../types/projectGraph';
+import type { ProjectGraphEdge, ProjectGraphEdgeKind, ProjectGraphFileKind, ProjectGraphNode, ProjectGraphNodeColor, ProjectGraphResult } from '../types/projectGraph';
 
 interface GraphFileEntry {
   id: string;
@@ -72,6 +72,7 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
       label: path.posix.basename(file.id),
       path: file.id,
       kind: file.kind,
+      color: classifyGraphNodeColor(file.id, file.kind),
       importCount: outgoingCounts.get(file.id) ?? 0,
       importedByCount: incomingCounts.get(file.id) ?? 0
     }))
@@ -95,9 +96,40 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
       fileCount: nodes.length,
       vueFileCount: nodes.filter((node) => node.kind === 'vue').length,
       tsFileCount: nodes.filter((node) => node.kind === 'ts').length,
+      storeFileCount: nodes.filter((node) => node.color === 'store').length,
+      serviceFileCount: nodes.filter((node) => node.color === 'service').length,
+      viewFileCount: nodes.filter((node) => node.color === 'view').length,
+      componentFileCount: nodes.filter((node) => node.color === 'component').length,
+      routerFileCount: nodes.filter((node) => node.color === 'router').length,
       edgeCount: edges.length
     }
   };
+}
+
+function classifyGraphNodeColor(filePath: string, kind: ProjectGraphFileKind): ProjectGraphNodeColor {
+  const normalizedPath = filePath.startsWith('src/') ? filePath.slice(4) : filePath;
+
+  if (normalizedPath.startsWith('stores/')) {
+    return 'store';
+  }
+
+  if (normalizedPath.startsWith('services/')) {
+    return 'service';
+  }
+
+  if (normalizedPath.startsWith('views/')) {
+    return 'view';
+  }
+
+  if (normalizedPath.startsWith('components/')) {
+    return 'component';
+  }
+
+  if (normalizedPath.startsWith('router/')) {
+    return 'router';
+  }
+
+  return kind === 'vue' ? 'vue' : 'ts';
 }
 
 async function collectGraphFiles() {
@@ -374,6 +406,11 @@ function createEmptyGraphResult(workspaceName: string): ProjectGraphResult {
       fileCount: 0,
       vueFileCount: 0,
       tsFileCount: 0,
+      storeFileCount: 0,
+      serviceFileCount: 0,
+      viewFileCount: 0,
+      componentFileCount: 0,
+      routerFileCount: 0,
       edgeCount: 0
     }
   };

@@ -25,6 +25,11 @@ export function renderProjectGraphWebview(
     .replaceAll('{{FILE_COUNT}}', String(graph.stats.fileCount))
     .replaceAll('{{VUE_FILE_COUNT}}', String(graph.stats.vueFileCount))
     .replaceAll('{{TS_FILE_COUNT}}', String(graph.stats.tsFileCount))
+    .replaceAll('{{STORE_FILE_COUNT}}', String(graph.stats.storeFileCount))
+    .replaceAll('{{SERVICE_FILE_COUNT}}', String(graph.stats.serviceFileCount))
+    .replaceAll('{{VIEW_FILE_COUNT}}', String(graph.stats.viewFileCount))
+    .replaceAll('{{COMPONENT_FILE_COUNT}}', String(graph.stats.componentFileCount))
+    .replaceAll('{{ROUTER_FILE_COUNT}}', String(graph.stats.routerFileCount))
     .replaceAll('{{EDGE_COUNT}}', String(graph.stats.edgeCount))
     .replaceAll('{{GRAPH_PAYLOAD}}', serializeForScript(graph));
 }

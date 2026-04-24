@@ -10,6 +10,16 @@
   --vue-glow: rgba(66, 184, 131, 0.24);
   --ts: #4da3ff;
   --ts-glow: rgba(77, 163, 255, 0.22);
+  --node-store: #f2c94c;
+  --node-store-glow: rgba(242, 201, 76, 0.22);
+  --node-service: #f2994a;
+  --node-service-glow: rgba(242, 153, 74, 0.22);
+  --node-view: #1f7a4d;
+  --node-view-glow: rgba(31, 122, 77, 0.22);
+  --node-component: #42b883;
+  --node-component-glow: rgba(66, 184, 131, 0.24);
+  --node-router: #9b51e0;
+  --node-router-glow: rgba(155, 81, 224, 0.22);
   --edge: rgba(149, 170, 192, 0.24);
   --edge-dynamic: rgba(242, 153, 74, 0.42);
   --accent: #f2994a;
@@ -106,6 +116,26 @@ h2 {
   box-shadow: inset 0 0 0 1px rgba(242, 153, 74, 0.18);
 }
 
+.stat-card--component {
+  box-shadow: inset 0 0 0 1px var(--node-component-glow);
+}
+
+.stat-card--view {
+  box-shadow: inset 0 0 0 1px var(--node-view-glow);
+}
+
+.stat-card--router {
+  box-shadow: inset 0 0 0 1px var(--node-router-glow);
+}
+
+.stat-card--store {
+  box-shadow: inset 0 0 0 1px var(--node-store-glow);
+}
+
+.stat-card--service {
+  box-shadow: inset 0 0 0 1px var(--node-service-glow);
+}
+
 .stat-label {
   color: var(--muted);
   font-size: 12px;
@@ -174,6 +204,8 @@ h2 {
 }
 
 .graph-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -202,6 +234,10 @@ h2 {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.empty-state[hidden] {
+  display: none;
+}
+
 .legend {
   display: grid;
   gap: 10px;
@@ -209,19 +245,20 @@ h2 {
   font-size: 14px;
 }
 
-.legend--compact {
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  gap: 16px;
-  margin-left: auto;
+.legend-panel {
+  padding: 20px 24px 24px;
 }
 
-@media (max-width: 960px) {
-  .legend--compact {
-    grid-auto-flow: row;
-    margin-left: 0;
-    width: 100%;
-  }
+.legend-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.legend--sectioned {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .legend-item {
@@ -248,6 +285,26 @@ h2 {
 
 .legend-swatch--ts {
   background: var(--ts);
+}
+
+.legend-swatch--component {
+  background: var(--node-component);
+}
+
+.legend-swatch--view {
+  background: var(--node-view);
+}
+
+.legend-swatch--router {
+  background: var(--node-router);
+}
+
+.legend-swatch--store {
+  background: var(--node-store);
+}
+
+.legend-swatch--service {
+  background: var(--node-service);
 }
 
 .legend-line {
@@ -303,16 +360,52 @@ h2 {
   stroke-width: 3;
 }
 
-.graph-node--vue circle {
-  fill: rgba(66, 184, 131, 0.16);
-  stroke: var(--vue);
-  filter: drop-shadow(0 0 18px rgba(66, 184, 131, 0.18));
+.graph-node--vue circle,
+.graph-node--component circle {
+  fill: color-mix(in srgb, var(--node-fill-color) 18%, transparent);
+  stroke: var(--node-fill-color);
+  filter: drop-shadow(0 0 18px var(--node-glow-color));
 }
 
-.graph-node--ts circle {
-  fill: rgba(77, 163, 255, 0.15);
-  stroke: var(--ts);
-  filter: drop-shadow(0 0 18px rgba(77, 163, 255, 0.16));
+.graph-node--ts circle,
+.graph-node--store circle,
+.graph-node--service circle,
+.graph-node--view circle,
+.graph-node--router circle {
+  fill: color-mix(in srgb, var(--node-fill-color) 18%, transparent);
+  stroke: var(--node-fill-color);
+  filter: drop-shadow(0 0 18px var(--node-glow-color));
+}
+
+.graph-node--vue,
+.graph-node--component {
+  --node-fill-color: var(--node-component);
+  --node-glow-color: var(--node-component-glow);
+}
+
+.graph-node--ts {
+  --node-fill-color: var(--ts);
+  --node-glow-color: var(--ts-glow);
+}
+
+.graph-node--store {
+  --node-fill-color: var(--node-store);
+  --node-glow-color: var(--node-store-glow);
+}
+
+.graph-node--service {
+  --node-fill-color: var(--node-service);
+  --node-glow-color: var(--node-service-glow);
+}
+
+.graph-node--view {
+  --node-fill-color: var(--node-view);
+  --node-glow-color: var(--node-view-glow);
+}
+
+.graph-node--router {
+  --node-fill-color: var(--node-router);
+  --node-glow-color: var(--node-router-glow);
 }
 
 .graph-label {
@@ -320,6 +413,22 @@ h2 {
   font-size: 12px;
   text-anchor: middle;
   pointer-events: none;
+}
+
+.stats-panel {
+  padding: 0 24px 24px;
+}
+
+.stats--expanded {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+@media (max-width: 1080px) {
+  .legend-panel,
+  .stats-panel {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
 }
 
 @media (max-width: 1080px) {

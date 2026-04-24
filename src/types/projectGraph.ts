@@ -1,5 +1,7 @@
 export type ProjectGraphFileKind = 'vue' | 'ts';
 
+export type ProjectGraphNodeColor = 'vue' | 'ts' | 'store' | 'service' | 'view' | 'component' | 'router';
+
 export type ProjectGraphEdgeKind = 'import' | 'dynamic-import';
 
 export interface ProjectGraphNode {
@@ -7,6 +9,7 @@ export interface ProjectGraphNode {
   label: string;
   path: string;
   kind: ProjectGraphFileKind;
+  color: ProjectGraphNodeColor;
   importCount: number;
   importedByCount: number;
 }
@@ -23,6 +26,11 @@ export interface ProjectGraphStats {
   fileCount: number;
   vueFileCount: number;
   tsFileCount: number;
+  storeFileCount: number;
+  serviceFileCount: number;
+  viewFileCount: number;
+  componentFileCount: number;
+  routerFileCount: number;
   edgeCount: number;
 }
 
