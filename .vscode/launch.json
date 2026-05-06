@@ -9,7 +9,7 @@
       "args": [
         "--new-window",
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--folder-uri=file:///Users/marcoarruda/Projects/CentelhaAM/01-WebAppUI"
+        "--folder-uri=file:///Users/marcoarruda/Kharon/cerebrum-ui"
       ],
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"

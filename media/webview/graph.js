@@ -3,6 +3,13 @@ const graphPayloadElement = document.getElementById('graph-payload');
 const graphCanvas = document.getElementById('graph-canvas');
 const emptyState = document.getElementById('empty-state');
 const isolatedToggle = document.getElementById('isolated-toggle');
+const routerToggle = document.getElementById('router-toggle');
+const servicesToggle = document.getElementById('services-toggle');
+const storesToggle = document.getElementById('stores-toggle');
+const composableTsToggle = document.getElementById('composable-ts-toggle');
+const viewComponentsToggle = document.getElementById('view-components-toggle');
+const componentFolderSection = document.getElementById('component-folder-section');
+const componentFolderToggles = document.getElementById('component-folder-toggles');
 const labelsToggle = document.getElementById('labels-toggle');
 const zoomOutButton = document.getElementById('zoom-out-button');
 const zoomResetButton = document.getElementById('zoom-reset-button');
@@ -11,12 +18,17 @@ const openGraphPanelButton = document.getElementById('open-graph-panel-button');
 
 const graph = parsePayload(graphPayloadElement);
 const currentPositions = new Map();
+const componentFolderFilterState = new Map(
+  collectComponentSubfolders(graph.nodes).map((folderName) => [folderName, false])
+);
+let shouldFitViewportOnRender = true;
 
 let visibleNodes = [];
 let visibleEdges = [];
 let connectedEdgesByNodeId = new Map();
 let viewportGroup = null;
 let suppressNextClick = false;
+let hoveredNodeId = null;
 
 const viewportState = {
   scale: 1,
@@ -47,6 +59,8 @@ if (graphCanvas) {
   graphCanvas.addEventListener('pointerup', handlePointerUp);
   graphCanvas.addEventListener('pointercancel', handlePointerUp);
   graphCanvas.addEventListener('lostpointercapture', resetInteractionState);
+  graphCanvas.addEventListener('mouseover', handleNodeMouseOver);
+  graphCanvas.addEventListener('mouseout', handleNodeMouseOut);
 }
 
 function parsePayload(payloadElement) {
@@ -63,6 +77,11 @@ function parsePayload(payloadElement) {
 
 function updateVisibleGraph() {
   const hideIsolated = Boolean(isolatedToggle?.checked);
+  const showRouter = Boolean(routerToggle?.checked);
+  const showServices = Boolean(servicesToggle?.checked);
+  const showStores = Boolean(storesToggle?.checked);
+  const showComposableTs = Boolean(composableTsToggle?.checked);
+  const showViewComponents = Boolean(viewComponentsToggle?.checked);
   const connectedNodeIds = new Set();
 
   for (const edge of graph.edges) {
@@ -70,7 +89,33 @@ function updateVisibleGraph() {
     connectedNodeIds.add(edge.target);
   }
 
-  visibleNodes = graph.nodes.filter((node) => !hideIsolated || connectedNodeIds.has(node.id));
+  visibleNodes = graph.nodes.filter((node) => {
+    if (!isComponentFolderVisible(node)) {
+      return false;
+    }
+
+    if (!showRouter && isRouterNode(node)) {
+      return false;
+    }
+
+    if (!showServices && isServiceNode(node)) {
+      return false;
+    }
+
+    if (!showStores && isStoreNode(node)) {
+      return false;
+    }
+
+    if (!showComposableTs && isComposableTsNode(node)) {
+      return false;
+    }
+
+    if (!showViewComponents && isViewComponentNode(node)) {
+      return false;
+    }
+
+    return !hideIsolated || connectedNodeIds.has(node.id);
+  });
   const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
   visibleEdges = graph.edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
 
@@ -84,6 +129,56 @@ function updateVisibleGraph() {
     targetEdges.push(edge);
     connectedEdgesByNodeId.set(edge.target, targetEdges);
   }
+}
+
+function normalizeNodePath(node) {
+  return node.path.replaceAll('\\', '/');
+}
+
+function pathAfterSrc(node) {
+  const normalizedPath = normalizeNodePath(node);
+  return normalizedPath.startsWith('src/') ? normalizedPath.slice(4) : normalizedPath;
+}
+
+function isRouterNode(node) {
+  return pathAfterSrc(node).startsWith('router/');
+}
+
+function isServiceNode(node) {
+  return pathAfterSrc(node).startsWith('services/');
+}
+
+function isStoreNode(node) {
+  return pathAfterSrc(node).startsWith('stores/');
+}
+
+function isComposableTsNode(node) {
+  return node.kind === 'ts' && !isRouterNode(node) && !isServiceNode(node) && !isStoreNode(node);
+}
+
+function isViewComponentNode(node) {
+  return /^views\/.*\/components\//.test(pathAfterSrc(node));
+}
+
+function componentFolderNameForNode(node) {
+  const relativePath = pathAfterSrc(node);
+  if (!relativePath.startsWith('components/')) {
+    return null;
+  }
+
+  const segments = relativePath.split('/');
+  return segments.length >= 3 ? segments[1] : null;
+}
+
+function collectComponentSubfolders(nodes) {
+  return Array.from(new Set(nodes
+    .map((node) => componentFolderNameForNode(node))
+    .filter((folderName) => Boolean(folderName)))).sort((left, right) => left.localeCompare(right));
+}
+
+function isComponentFolderVisible(node) {
+  const folderName = componentFolderNameForNode(node);
+  return folderName ? componentFolderFilterState.get(folderName) !== false : true;
 }
 
 function createLayout(nodes, width, height) {
@@ -205,10 +300,34 @@ function createLayout(nodes, width, height) {
     })
   };
 
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const routerNodeIds = new Set(groupedNodes.router.map((node) => node.id));
+  const routerConnectedViewIds = new Set();
+  for (const edge of edges) {
+    const sourceIsRouter = routerNodeIds.has(edge.source);
+    const targetIsRouter = routerNodeIds.has(edge.target);
+    if (!sourceIsRouter && !targetIsRouter) {
+      continue;
+    }
+
+    const candidateId = sourceIsRouter ? edge.target : edge.source;
+    const candidateNode = nodesById.get(candidateId);
+    if (candidateNode && pathAfterSrc(candidateNode).startsWith('views/')) {
+      routerConnectedViewIds.add(candidateNode.id);
+    }
+  }
+
+  const routerConnectedViews = groupedNodes.other.filter((node) => routerConnectedViewIds.has(node.id));
+  groupedNodes.other = groupedNodes.other.filter((node) => !routerConnectedViewIds.has(node.id));
+
   const otherLevels = groupedNodes.other.map((node) => levelByNodeId.get(node.id) || 0);
+
   const maxOtherLevel = otherLevels.length > 0 ? Math.max(...otherLevels) : 0;
+  const hasRouterConnectedViews = routerConnectedViews.length > 0;
+  const serviceStoreRowIndex = hasRouterConnectedViews ? 3 : 2;
+  const otherRowBaseIndex = hasRouterConnectedViews ? 4 : 3;
   const otherRowCount = Math.max(1, maxOtherLevel + 1);
-  const rowCount = 3 + otherRowCount;
+  const rowCount = otherRowBaseIndex + otherRowCount;
   const rowGap = rowCount > 1 ? availableHeight / (rowCount - 1) : 0;
 
   function placeNodesHorizontally(bucketNodes, rowIndex, startX, laneWidth) {
@@ -217,31 +336,56 @@ function createLayout(nodes, width, height) {
     }
 
     const y = topPadding + rowGap * rowIndex;
-    const innerWidth = Math.max(laneWidth, 1);
-    const gap = bucketNodes.length > 1 ? innerWidth / (bucketNodes.length - 1) : 0;
+    const laneCenter = startX + Math.max(laneWidth, 1) / 2;
 
+    if (bucketNodes.length === 1) {
+      positions.set(bucketNodes[0].id, {
+        x: laneCenter,
+        y,
+        depth: rowIndex
+      });
+      return;
+    }
+
+    const diameters = bucketNodes.map((node) => radiusForNode(node) * 2);
+    const minimumGaps = bucketNodes.slice(0, -1).map((node, index) => {
+      return Math.max(diameters[index], diameters[index + 1]) * 2;
+    });
+    const minimumSpan = minimumGaps.reduce((sum, gap) => sum + gap, 0);
+    const targetSpan = Math.max(Math.max(laneWidth, 1), minimumSpan);
+    const extraGap = (targetSpan - minimumSpan) / minimumGaps.length;
+    const firstRadius = diameters[0] / 2;
+    const lastRadius = diameters[diameters.length - 1] / 2;
+    const minCenterX = leftPadding + firstRadius;
+    const maxCenterX = width - rightPadding - lastRadius;
+    const unclampedStartX = laneCenter - targetSpan / 2;
+    const maxStartX = Math.max(minCenterX, maxCenterX - targetSpan);
+    const rowStartX = Math.min(Math.max(unclampedStartX, minCenterX), maxStartX);
+
+    let x = rowStartX;
     bucketNodes.forEach((node, nodeIndex) => {
-      const x = bucketNodes.length === 1
-        ? startX + innerWidth / 2
-        : startX + gap * nodeIndex;
-
       positions.set(node.id, {
         x,
         y,
         depth: rowIndex
       });
+
+      x += (minimumGaps[nodeIndex] || 0) + extraGap;
     });
   }
 
   placeNodesHorizontally(groupedNodes.root, 0, width * 0.3, width * 0.4);
   placeNodesHorizontally(groupedNodes.router, 1, width * 0.28, width * 0.44);
-  placeNodesHorizontally(groupedNodes.service, 2, leftPadding, availableWidth * 0.34);
-  placeNodesHorizontally(groupedNodes.store, 2, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
+  if (hasRouterConnectedViews) {
+    placeNodesHorizontally(routerConnectedViews, 2, leftPadding, availableWidth);
+  }
+  placeNodesHorizontally(groupedNodes.service, serviceStoreRowIndex, leftPadding, availableWidth * 0.34);
+  placeNodesHorizontally(groupedNodes.store, serviceStoreRowIndex, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
 
   const otherRows = new Map();
   for (const node of groupedNodes.other) {
     const inferredLevel = levelByNodeId.get(node.id) || 0;
-    const rowIndex = 3 + Math.max(0, inferredLevel);
+    const rowIndex = otherRowBaseIndex + Math.max(0, inferredLevel);
     const bucket = otherRows.get(rowIndex) || [];
     bucket.push(node);
     otherRows.set(rowIndex, bucket);
@@ -254,21 +398,117 @@ function createLayout(nodes, width, height) {
   return positions;
 }
 
-function ensureNodePositions(width, height) {
-  const layoutPositions = createLayout(graph.nodes, width, height);
+function ensureNodePositions(nodes, width, height) {
+  const layoutPositions = createLayout(nodes, width, height);
 
-  for (const node of graph.nodes) {
+  for (const node of nodes) {
     if (!currentPositions.has(node.id)) {
       currentPositions.set(node.id, layoutPositions.get(node.id));
     }
   }
 
-  const knownNodeIds = new Set(graph.nodes.map((node) => node.id));
+  const knownNodeIds = new Set(nodes.map((node) => node.id));
   for (const nodeId of currentPositions.keys()) {
     if (!knownNodeIds.has(nodeId)) {
       currentPositions.delete(nodeId);
     }
   }
+}
+
+function renderComponentFolderToggles() {
+  if (!componentFolderToggles) {
+    return;
+  }
+
+  const folderNames = collectComponentSubfolders(graph.nodes);
+  if (componentFolderSection) {
+    componentFolderSection.hidden = folderNames.length === 0;
+  }
+
+  componentFolderToggles.innerHTML = folderNames.map((folderName) => {
+    const checked = componentFolderFilterState.get(folderName) !== false ? ' checked' : '';
+    const inputId = 'component-folder-toggle-' + folderName.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-');
+    return '<label class="toggle" for="' + escapeHtml(inputId) + '">'
+      + '<input id="' + escapeHtml(inputId) + '" type="checkbox" data-component-folder="' + escapeHtml(folderName) + '"' + checked + ' />'
+      + '<span>Show components/' + escapeHtml(folderName) + '</span>'
+      + '</label>';
+  }).join('');
+
+  for (const toggle of componentFolderToggles.querySelectorAll('input[data-component-folder]')) {
+    toggle.addEventListener('change', () => {
+      const folderName = toggle.getAttribute('data-component-folder');
+      if (!folderName) {
+        return;
+      }
+
+      componentFolderFilterState.set(folderName, toggle.checked);
+      rerenderGraphWithLayoutReset();
+    });
+  }
+}
+
+function resetViewport() {
+  viewportState.scale = 1;
+  viewportState.tx = 0;
+  viewportState.ty = 0;
+}
+
+function fitViewportToVisibleGraph() {
+  if (!graphCanvas || !viewportGroup || visibleNodes.length === 0) {
+    return;
+  }
+
+  const showLabels = Boolean(labelsToggle?.checked);
+  const bounds = getVisibleGraphBounds(showLabels);
+  const viewBox = currentViewBox();
+  const padding = 48;
+  const availableWidth = Math.max(viewBox.width - padding * 2, 1);
+  const availableHeight = Math.max(viewBox.height - padding * 2, 1);
+  const graphWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const graphHeight = Math.max(bounds.maxY - bounds.minY, 1);
+  const fitScale = Math.min(availableWidth / graphWidth, availableHeight / graphHeight);
+  const nextScale = clamp(Math.min(1, fitScale), MIN_SCALE, MAX_SCALE);
+  const graphCenterX = (bounds.minX + bounds.maxX) / 2;
+  const graphCenterY = (bounds.minY + bounds.maxY) / 2;
+  const viewCenterX = viewBox.x + viewBox.width / 2;
+  const viewCenterY = viewBox.y + viewBox.height / 2;
+
+  viewportState.scale = nextScale;
+  viewportState.tx = viewCenterX - graphCenterX * nextScale;
+  viewportState.ty = viewCenterY - graphCenterY * nextScale;
+}
+
+function getVisibleGraphBounds(showLabels) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const node of visibleNodes) {
+    const position = currentPositions.get(node.id);
+    if (!position) {
+      continue;
+    }
+
+    const radius = radiusForNode(node);
+    minX = Math.min(minX, position.x - radius);
+    minY = Math.min(minY, position.y - radius);
+    maxX = Math.max(maxX, position.x + radius);
+    maxY = Math.max(maxY, position.y + radius + (showLabels ? 24 : 0));
+  }
+
+  if (!Number.isFinite(minX)) {
+    return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+function rerenderGraphWithLayoutReset() {
+  currentPositions.clear();
+  resetViewport();
+  shouldFitViewportOnRender = true;
+  renderGraph();
 }
 
 function visiblePositions() {
@@ -311,7 +551,7 @@ function renderGraph() {
   const height = Math.max(graphCanvas.clientHeight || 720, 520);
   graphCanvas.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
 
-  ensureNodePositions(width, height);
+  ensureNodePositions(visibleNodes, width, height);
   const positions = visiblePositions();
   const showLabels = Boolean(labelsToggle?.checked);
 
@@ -321,7 +561,74 @@ function renderGraph() {
     + '</g>';
 
   viewportGroup = graphCanvas.querySelector('#graph-viewport');
+  applyHoveredNodeState();
+  if (shouldFitViewportOnRender) {
+    fitViewportToVisibleGraph();
+    shouldFitViewportOnRender = false;
+  }
   applyViewportTransform();
+}
+
+function handleNodeMouseOver(event) {
+  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
+  if (!nodeElement) {
+    return;
+  }
+
+  setHoveredNode(nodeElement.getAttribute('data-node-id'));
+}
+
+function handleNodeMouseOut(event) {
+  const nodeElement = event.target instanceof Element ? event.target.closest('.graph-node') : null;
+  if (!nodeElement) {
+    return;
+  }
+
+  const relatedNodeElement = event.relatedTarget instanceof Element
+    ? event.relatedTarget.closest('.graph-node')
+    : null;
+
+  if (relatedNodeElement === nodeElement) {
+    return;
+  }
+
+  if (relatedNodeElement) {
+    setHoveredNode(relatedNodeElement.getAttribute('data-node-id'));
+    return;
+  }
+
+  setHoveredNode(null);
+}
+
+function setHoveredNode(nodeId) {
+  hoveredNodeId = nodeId;
+  applyHoveredNodeState();
+}
+
+function applyHoveredNodeState() {
+  if (!graphCanvas) {
+    return;
+  }
+
+  const hasHoveredNode = Boolean(hoveredNodeId) && visibleNodes.some((node) => node.id === hoveredNodeId);
+  graphCanvas.classList.toggle('is-node-hovering', hasHoveredNode);
+  const connectedEdges = hasHoveredNode ? connectedEdgesByNodeId.get(hoveredNodeId) || [] : [];
+  const hoveredEdgeIds = new Set(connectedEdges.map((edge) => edge.id));
+  const connectedNodeIds = new Set(
+    connectedEdges.flatMap((edge) => [edge.source, edge.target]).filter((nodeId) => nodeId !== hoveredNodeId)
+  );
+
+  for (const nodeElement of graphCanvas.querySelectorAll('.graph-node')) {
+    const isHovered = hasHoveredNode && nodeElement.getAttribute('data-node-id') === hoveredNodeId;
+    const isConnected = hasHoveredNode && connectedNodeIds.has(nodeElement.getAttribute('data-node-id') || '');
+    nodeElement.classList.toggle('is-hovered', isHovered);
+    nodeElement.classList.toggle('is-connected', isConnected);
+  }
+
+  for (const edgeElement of graphCanvas.querySelectorAll('.graph-edge')) {
+    const isHovered = hasHoveredNode && hoveredEdgeIds.has(edgeElement.getAttribute('data-edge-id') || '');
+    edgeElement.classList.toggle('is-hovered', isHovered);
+  }
 }
 
 function renderEdges(edges, positions) {
@@ -641,11 +948,34 @@ function escapeHtml(value) {
 }
 
 if (isolatedToggle) {
-  isolatedToggle.addEventListener('change', renderGraph);
+  isolatedToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (routerToggle) {
+  routerToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (servicesToggle) {
+  servicesToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (storesToggle) {
+  storesToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (composableTsToggle) {
+  composableTsToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (viewComponentsToggle) {
+  viewComponentsToggle.addEventListener('change', rerenderGraphWithLayoutReset);
 }
 
 if (labelsToggle) {
-  labelsToggle.addEventListener('change', renderGraph);
+  labelsToggle.addEventListener('change', () => {
+    shouldFitViewportOnRender = true;
+    renderGraph();
+  });
 }
 
 if (zoomOutButton) {
@@ -656,9 +986,9 @@ if (zoomOutButton) {
 
 if (zoomResetButton) {
   zoomResetButton.addEventListener('click', () => {
-    viewportState.scale = 1;
-    viewportState.tx = 0;
-    viewportState.ty = 0;
+    resetViewport();
+    shouldFitViewportOnRender = true;
+    fitViewportToVisibleGraph();
     applyViewportTransform();
   });
 }
@@ -675,5 +1005,9 @@ if (openGraphPanelButton) {
   });
 }
 
-window.addEventListener('resize', renderGraph);
+renderComponentFolderToggles();
+window.addEventListener('resize', () => {
+  shouldFitViewportOnRender = true;
+  renderGraph();
+});
 renderGraph();

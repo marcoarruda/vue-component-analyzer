@@ -36,23 +36,53 @@
       </section>
 
       <section class="panel controls-panel">
-        <label class="toggle">
-          <input id="isolated-toggle" type="checkbox" checked />
-          <span>Hide isolated files</span>
-        </label>
-        <label class="toggle">
-          <input id="labels-toggle" type="checkbox" checked />
-          <span>Show labels</span>
-        </label>
-        <div class="zoom-controls" aria-label="Graph zoom controls">
-          <button id="zoom-out-button" class="zoom-button" type="button">-</button>
-          <button id="zoom-reset-button" class="zoom-button zoom-button--reset" type="button">Reset</button>
-          <button id="zoom-in-button" class="zoom-button" type="button">+</button>
+        <div class="controls-section">
+          <div class="controls-section__title">Graph</div>
+          <label class="toggle">
+            <input id="isolated-toggle" type="checkbox" checked />
+            <span>Hide isolated files</span>
+          </label>
+          <label class="toggle">
+            <input id="labels-toggle" type="checkbox" checked />
+            <span>Show labels</span>
+          </label>
+        </div>
+        <div class="controls-section">
+          <div class="controls-section__title">Architecture</div>
+          <label class="toggle">
+            <input id="router-toggle" type="checkbox" checked />
+            <span>Show router</span>
+          </label>
+          <label class="toggle">
+            <input id="services-toggle" type="checkbox" />
+            <span>Show services</span>
+          </label>
+          <label class="toggle">
+            <input id="stores-toggle" type="checkbox" />
+            <span>Show stores</span>
+          </label>
+          <label class="toggle">
+            <input id="composable-ts-toggle" type="checkbox" />
+            <span>Show composable TS files</span>
+          </label>
+          <label class="toggle">
+            <input id="view-components-toggle" type="checkbox" checked />
+            <span>Show view components</span>
+          </label>
+        </div>
+        <div id="component-folder-section" class="controls-section" hidden>
+          <div class="controls-section__title">Component Folders</div>
+          <div id="component-folder-toggles" class="toggle-group"></div>
         </div>
       </section>
 
       <section class="panel graph-panel">
         <div class="graph-stage">
+          <div class="zoom-controls zoom-controls--overlay" aria-label="Graph zoom controls">
+            <button id="zoom-out-button" class="zoom-button" type="button">-</button>
+            <button id="zoom-reset-button" class="zoom-button zoom-button--reset" type="button">Reset</button>
+            <button id="zoom-in-button" class="zoom-button" type="button">+</button>
+          </div>
           <svg id="graph-canvas" class="graph-canvas" aria-label="Project dependency graph"></svg>
           <div id="empty-state" class="empty-state" hidden>No Vue or TypeScript relations were found in this workspace.</div>
         </div>

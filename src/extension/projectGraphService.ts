@@ -371,7 +371,12 @@ function isGraphFile(uri: vscode.Uri) {
   }
 
   const normalizedPath = normalizeFsPath(uri.fsPath);
+  const fileName = path.basename(normalizedPath).toLowerCase();
   if (normalizedPath.endsWith('.d.ts')) {
+    return false;
+  }
+
+  if (fileName === 'spec.ts' || fileName.endsWith('.spec.ts')) {
     return false;
   }
 

@@ -55,6 +55,7 @@ body.graph-layout--sidebar .shell {
   gap: 12px;
 }
 
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -166,11 +167,30 @@ h2 {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
 }
 
 body.graph-layout--sidebar .controls-panel {
   display: none;
+}
+
+.controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 180px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.controls-section__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .toggle {
@@ -180,11 +200,30 @@ body.graph-layout--sidebar .controls-panel {
   color: var(--muted);
 }
 
+.toggle-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-direction: column;
+  flex-wrap: wrap;
+}
+
 .zoom-controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+}
+
+.zoom-controls--overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(11, 16, 32, 0.78);
+  backdrop-filter: blur(14px);
 }
 
 .zoom-button {
@@ -223,10 +262,6 @@ body.graph-layout--sidebar .graph-panel {
   overflow: hidden;
 }
 
-body.graph-layout--sidebar .graph-stage {
-  min-height: 460px;
-}
-
 .graph-canvas {
   position: absolute;
   inset: 0;
@@ -235,7 +270,10 @@ body.graph-layout--sidebar .graph-stage {
   display: block;
   cursor: grab;
   touch-action: none;
-  user-select: none;
+}
+
+body.graph-layout--sidebar .graph-stage {
+  min-height: 460px;
 }
 
 .graph-canvas.is-panning {
@@ -398,13 +436,32 @@ body:not(.graph-layout--sidebar) .graph-launch-panel {
   stroke-width: 2.75;
 }
 
+.graph-canvas.is-node-hovering .graph-edge {
+  opacity: 0.2;
+}
+
+.graph-canvas.is-node-hovering .graph-edge.is-hovered {
+  opacity: 1;
+  stroke-width: 2.75;
+}
+
 .graph-node {
   cursor: pointer;
   user-select: none;
+  transition: opacity 120ms ease;
 }
 
 .graph-node.is-dragging {
   cursor: grabbing;
+}
+
+.graph-canvas.is-node-hovering .graph-node {
+  opacity: 0.2;
+}
+
+.graph-canvas.is-node-hovering .graph-node.is-connected,
+.graph-canvas.is-node-hovering .graph-node.is-hovered {
+  opacity: 1;
 }
 
 .graph-node circle {
