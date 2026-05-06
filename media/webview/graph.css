@@ -201,11 +201,10 @@ body.graph-layout--sidebar .controls-panel {
 }
 
 .toggle-group {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 12px;
-  flex-direction: column;
-  flex-wrap: wrap;
 }
 
 .zoom-controls {
@@ -527,6 +526,14 @@ body:not(.graph-layout--sidebar) .graph-launch-panel {
   font-size: 12px;
   text-anchor: middle;
   pointer-events: none;
+}
+
+.graph-label.is-hidden {
+  display: none;
+}
+
+.graph-label--path {
+  font-size: 11px;
 }
 
 .stats-panel {

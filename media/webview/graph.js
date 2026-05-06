@@ -625,6 +625,7 @@ function applyHoveredNodeState() {
   }
 
   const hasHoveredNode = Boolean(hoveredNodeId) && visibleNodes.some((node) => node.id === hoveredNodeId);
+  const showLabels = Boolean(labelsToggle?.checked);
   graphCanvas.classList.toggle('is-node-hovering', hasHoveredNode);
   const connectedEdges = hasHoveredNode ? connectedEdgesByNodeId.get(hoveredNodeId) || [] : [];
   const hoveredEdgeIds = new Set(connectedEdges.map((edge) => edge.id));
@@ -637,6 +638,16 @@ function applyHoveredNodeState() {
     const isConnected = hasHoveredNode && connectedNodeIds.has(nodeElement.getAttribute('data-node-id') || '');
     nodeElement.classList.toggle('is-hovered', isHovered);
     nodeElement.classList.toggle('is-connected', isConnected);
+
+    const labelElement = nodeElement.querySelector('.graph-label');
+    if (labelElement) {
+      const shouldShowPath = isHovered || isConnected;
+      const defaultLabel = nodeElement.getAttribute('data-node-label') || '';
+      const fullPath = nodeElement.getAttribute('data-node-path') || defaultLabel;
+      labelElement.textContent = shouldShowPath ? fullPath : defaultLabel;
+      labelElement.classList.toggle('graph-label--path', shouldShowPath);
+      labelElement.classList.toggle('is-hidden', !showLabels && !shouldShowPath);
+    }
   }
 
   for (const edgeElement of graphCanvas.querySelectorAll('.graph-edge')) {
@@ -670,11 +681,10 @@ function renderNodes(nodes, positions, showLabels) {
     }
 
     const radius = radiusForNode(node);
-    const label = showLabels
-      ? '<text class="graph-label" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(node.label) + '</text>'
-      : '';
+    const labelClassName = showLabels ? 'graph-label' : 'graph-label is-hidden';
+    const label = '<text class="' + labelClassName + '" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(node.label) + '</text>';
 
-    return '<g class="graph-node graph-node--' + node.color + '" data-node-id="' + escapeHtml(node.id) + '">'
+    return '<g class="graph-node graph-node--' + node.color + '" data-node-id="' + escapeHtml(node.id) + '" data-node-label="' + escapeHtml(node.label) + '" data-node-path="' + escapeHtml(node.path) + '">'
       + '<circle cx="' + position.x.toFixed(2) + '" cy="' + position.y.toFixed(2) + '" r="' + radius.toFixed(2) + '"></circle>'
       + label
       + '</g>';
