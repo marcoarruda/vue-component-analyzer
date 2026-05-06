@@ -3,6 +3,7 @@ const graphPayloadElement = document.getElementById('graph-payload');
 const graphCanvas = document.getElementById('graph-canvas');
 const emptyState = document.getElementById('empty-state');
 const isolatedToggle = document.getElementById('isolated-toggle');
+const appEntryToggle = document.getElementById('app-entry-toggle');
 const routerToggle = document.getElementById('router-toggle');
 const servicesToggle = document.getElementById('services-toggle');
 const storesToggle = document.getElementById('stores-toggle');
@@ -77,6 +78,7 @@ function parsePayload(payloadElement) {
 
 function updateVisibleGraph() {
   const hideIsolated = Boolean(isolatedToggle?.checked);
+  const showAppEntries = Boolean(appEntryToggle?.checked);
   const showRouter = Boolean(routerToggle?.checked);
   const showServices = Boolean(servicesToggle?.checked);
   const showStores = Boolean(storesToggle?.checked);
@@ -91,6 +93,10 @@ function updateVisibleGraph() {
 
   visibleNodes = graph.nodes.filter((node) => {
     if (!isComponentFolderVisible(node)) {
+      return false;
+    }
+
+    if (!showAppEntries && isAppEntryNode(node)) {
       return false;
     }
 
@@ -144,6 +150,10 @@ function isRouterNode(node) {
   return pathAfterSrc(node).startsWith('router/');
 }
 
+function isAppEntryNode(node) {
+  return node.path === 'src/App.vue' || node.path === 'src/main.ts';
+}
+
 function isServiceNode(node) {
   return pathAfterSrc(node).startsWith('services/');
 }
@@ -153,7 +163,11 @@ function isStoreNode(node) {
 }
 
 function isComposableTsNode(node) {
-  return node.kind === 'ts' && !isRouterNode(node) && !isServiceNode(node) && !isStoreNode(node);
+  return node.kind === 'ts'
+    && !isAppEntryNode(node)
+    && !isRouterNode(node)
+    && !isServiceNode(node)
+    && !isStoreNode(node);
 }
 
 function isViewComponentNode(node) {
@@ -949,6 +963,10 @@ function escapeHtml(value) {
 
 if (isolatedToggle) {
   isolatedToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (appEntryToggle) {
+  appEntryToggle.addEventListener('change', rerenderGraphWithLayoutReset);
 }
 
 if (routerToggle) {
