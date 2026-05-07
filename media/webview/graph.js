@@ -30,7 +30,18 @@ const componentFolderFilterState = new Map(
 let shouldFitViewportOnRender = true;
 
 let selectedNodeId = null;
-const preSelectionCheckboxState = new Map();
+
+const DEFAULT_CHECKBOX_STATE = new Map([
+  ['isolated-toggle', true],
+  ['tests-toggle', false],
+  ['stories-toggle', false],
+  ['app-entry-toggle', true],
+  ['router-toggle', true],
+  ['services-toggle', false],
+  ['stores-toggle', false],
+  ['composable-ts-toggle', false],
+  ['view-components-toggle', true]
+]);
 
 let visibleNodes = [];
 let visibleEdges = [];
@@ -945,13 +956,6 @@ function getAllStaticToggles() {
   ].filter(Boolean);
 }
 
-function saveCheckboxStates() {
-  preSelectionCheckboxState.clear();
-  for (const toggle of getAllStaticToggles()) {
-    preSelectionCheckboxState.set(toggle.id, toggle.checked);
-  }
-}
-
 function setAllCheckboxesChecked() {
   for (const toggle of getAllStaticToggles()) {
     toggle.checked = true;
@@ -960,9 +964,9 @@ function setAllCheckboxesChecked() {
 
 function restoreCheckboxStates() {
   for (const toggle of getAllStaticToggles()) {
-    const saved = preSelectionCheckboxState.get(toggle.id);
-    if (saved !== undefined) {
-      toggle.checked = saved;
+    const defaultValue = DEFAULT_CHECKBOX_STATE.get(toggle.id);
+    if (defaultValue !== undefined) {
+      toggle.checked = defaultValue;
     }
   }
 }
@@ -978,7 +982,6 @@ function selectNode(nodeId) {
     return;
   }
 
-  saveCheckboxStates();
   selectedNodeId = nodeId;
   setAllCheckboxesChecked();
 
