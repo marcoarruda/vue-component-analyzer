@@ -37,7 +37,10 @@
 
       <section class="panel controls-panel">
         <div class="controls-section">
-          <div class="controls-section__title">Graph</div>
+          <div class="controls-section__header">
+            <div class="controls-section__title">Graph</div>
+            <div class="controls-section__toggles"><button class="toggle-all-btn" data-section="graph" data-action="all">All</button> / <button class="toggle-all-btn" data-section="graph" data-action="none">None</button></div>
+          </div>
           <label class="toggle">
             <input id="isolated-toggle" type="checkbox" checked />
             <span>Hide isolated files</span>
@@ -56,7 +59,10 @@
           </label>
         </div>
         <div class="controls-section">
-          <div class="controls-section__title">Architecture</div>
+          <div class="controls-section__header">
+            <div class="controls-section__title">Architecture</div>
+            <div class="controls-section__toggles"><button class="toggle-all-btn" data-section="architecture" data-action="all">All</button> / <button class="toggle-all-btn" data-section="architecture" data-action="none">None</button></div>
+          </div>
           <label class="toggle">
             <input id="app-entry-toggle" type="checkbox" checked />
             <span>Show app entry files</span>
@@ -83,7 +89,10 @@
           </label>
         </div>
         <div id="component-folder-section" class="controls-section" hidden>
-          <div class="controls-section__title">Component Folders</div>
+          <div class="controls-section__header">
+            <div class="controls-section__title">Component Folders</div>
+            <div class="controls-section__toggles"><button class="toggle-all-btn" data-section="component-folders" data-action="all">All</button> / <button class="toggle-all-btn" data-section="component-folders" data-action="none">None</button></div>
+          </div>
           <div id="component-folder-toggles" class="toggle-group"></div>
         </div>
       </section>

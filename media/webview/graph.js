@@ -1244,6 +1244,32 @@ if (deselectNodeButton) {
   deselectNodeButton.addEventListener('click', deselectNode);
 }
 
+for (const btn of document.querySelectorAll('.toggle-all-btn')) {
+  btn.addEventListener('click', () => {
+    const section = btn.getAttribute('data-section');
+    const checked = btn.getAttribute('data-action') === 'all';
+
+    if (section === 'graph') {
+      for (const id of ['isolated-toggle', 'labels-toggle', 'tests-toggle', 'stories-toggle']) {
+        const el = document.getElementById(id);
+        if (el) { el.checked = checked; }
+      }
+    } else if (section === 'architecture') {
+      for (const id of ['app-entry-toggle', 'router-toggle', 'services-toggle', 'stores-toggle', 'composable-ts-toggle', 'view-components-toggle']) {
+        const el = document.getElementById(id);
+        if (el) { el.checked = checked; }
+      }
+    } else if (section === 'component-folders') {
+      for (const key of componentFolderFilterState.keys()) {
+        componentFolderFilterState.set(key, checked);
+      }
+      renderComponentFolderToggles();
+    }
+
+    rerenderGraphWithLayoutReset();
+  });
+}
+
 renderComponentFolderToggles();
 window.addEventListener('resize', () => {
   shouldFitViewportOnRender = true;
