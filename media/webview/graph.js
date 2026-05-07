@@ -956,10 +956,18 @@ function getAllStaticToggles() {
   ].filter(Boolean);
 }
 
+function resetComponentFolderFilterState(value) {
+  for (const key of componentFolderFilterState.keys()) {
+    componentFolderFilterState.set(key, value);
+  }
+  renderComponentFolderToggles();
+}
+
 function setAllCheckboxesChecked() {
   for (const toggle of getAllStaticToggles()) {
     toggle.checked = true;
   }
+  resetComponentFolderFilterState(true);
 }
 
 function restoreCheckboxStates() {
@@ -969,6 +977,7 @@ function restoreCheckboxStates() {
       toggle.checked = defaultValue;
     }
   }
+  resetComponentFolderFilterState(false);
 }
 
 function selectNode(nodeId) {
@@ -1210,10 +1219,12 @@ if (zoomOutButton) {
 
 if (zoomResetButton) {
   zoomResetButton.addEventListener('click', () => {
-    resetViewport();
-    shouldFitViewportOnRender = true;
-    fitViewportToVisibleGraph();
-    applyViewportTransform();
+    if (selectedNodeId) {
+      setAllCheckboxesChecked();
+    } else {
+      restoreCheckboxStates();
+    }
+    rerenderGraphWithLayoutReset();
   });
 }
 
