@@ -973,7 +973,7 @@ function restoreCheckboxStates() {
 
 function selectNode(nodeId) {
   if (selectedNodeId === nodeId) {
-    deselectNode();
+    openNodeFile(nodeId);
     return;
   }
 
