@@ -536,6 +536,63 @@ body:not(.graph-layout--sidebar) .graph-launch-panel {
   font-size: 11px;
 }
 
+.selected-node-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(11, 16, 32, 0.78);
+  backdrop-filter: blur(14px);
+  max-width: calc(100% - 180px);
+  animation: badge-appear 160ms ease;
+}
+
+.selected-node-badge[hidden] {
+  display: none;
+}
+
+@keyframes badge-appear {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.selected-node-badge__name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-node-badge__deselect {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.selected-node-badge__deselect:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
+
 .stats-panel {
   padding: 0 24px 24px;
 }

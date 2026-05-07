@@ -95,6 +95,10 @@
             <button id="zoom-reset-button" class="zoom-button zoom-button--reset" type="button">Reset</button>
             <button id="zoom-in-button" class="zoom-button" type="button">+</button>
           </div>
+          <div id="selected-node-badge" class="selected-node-badge" hidden>
+            <span id="selected-node-badge-name" class="selected-node-badge__name"></span>
+            <button id="deselect-node-button" class="selected-node-badge__deselect" type="button" aria-label="Deselect node">✕</button>
+          </div>
           <svg id="graph-canvas" class="graph-canvas" aria-label="Project dependency graph"></svg>
           <div id="empty-state" class="empty-state" hidden>No Vue or TypeScript relations were found in this workspace.</div>
         </div>

@@ -18,6 +18,9 @@ const zoomOutButton = document.getElementById('zoom-out-button');
 const zoomResetButton = document.getElementById('zoom-reset-button');
 const zoomInButton = document.getElementById('zoom-in-button');
 const openGraphPanelButton = document.getElementById('open-graph-panel-button');
+const selectedNodeBadge = document.getElementById('selected-node-badge');
+const selectedNodeBadgeName = document.getElementById('selected-node-badge-name');
+const deselectNodeButton = document.getElementById('deselect-node-button');
 
 const graph = parsePayload(graphPayloadElement);
 const currentPositions = new Map();
@@ -25,6 +28,9 @@ const componentFolderFilterState = new Map(
   collectComponentSubfolders(graph.nodes).map((folderName) => [folderName, false])
 );
 let shouldFitViewportOnRender = true;
+
+let selectedNodeId = null;
+const preSelectionCheckboxState = new Map();
 
 let visibleNodes = [];
 let visibleEdges = [];
@@ -135,6 +141,16 @@ function updateVisibleGraph() {
 
     return !hideIsolated || connectedNodeIds.has(node.id);
   });
+
+  if (selectedNodeId) {
+    const focusEdges = graph.edges.filter(
+      (edge) => edge.source === selectedNodeId || edge.target === selectedNodeId
+    );
+    const focusNodeIds = new Set(focusEdges.flatMap((edge) => [edge.source, edge.target]));
+    focusNodeIds.add(selectedNodeId);
+    visibleNodes = visibleNodes.filter((node) => focusNodeIds.has(node.id));
+  }
+
   const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
   visibleEdges = graph.edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
 
@@ -232,8 +248,36 @@ function collectComponentSubfolders(nodes) {
 }
 
 function isComponentFolderVisible(node) {
+  if (selectedNodeId) {
+    return true;
+  }
   const folderName = componentFolderNameForNode(node);
   return folderName ? componentFolderFilterState.get(folderName) !== false : true;
+}
+
+function createFocusLayout(centerNodeId, nodes, width, height) {
+  const positions = new Map();
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  positions.set(centerNodeId, { x: centerX, y: centerY, depth: 0 });
+
+  const surrounding = nodes.filter((node) => node.id !== centerNodeId);
+  if (surrounding.length === 0) {
+    return positions;
+  }
+
+  const orbitRadius = Math.min(width, height) * 0.35;
+  surrounding.forEach((node, index) => {
+    const angle = (index / surrounding.length) * (2 * Math.PI) - Math.PI / 2;
+    positions.set(node.id, {
+      x: centerX + orbitRadius * Math.cos(angle),
+      y: centerY + orbitRadius * Math.sin(angle),
+      depth: 1
+    });
+  });
+
+  return positions;
 }
 
 function createLayout(nodes, width, height) {
@@ -482,7 +526,9 @@ function createLayout(nodes, width, height) {
 }
 
 function ensureNodePositions(nodes, width, height) {
-  const layoutPositions = createLayout(nodes, width, height);
+  const layoutPositions = selectedNodeId
+    ? createFocusLayout(selectedNodeId, nodes, width, height)
+    : createLayout(nodes, width, height);
 
   for (const node of nodes) {
     if (!currentPositions.has(node.id)) {
@@ -851,7 +897,7 @@ function handlePointerUp(event) {
   resetInteractionState();
 
   if (shouldOpenNode && nodeId) {
-    openNodeFile(nodeId);
+    selectNode(nodeId);
   }
 }
 
@@ -883,6 +929,78 @@ function openNodeFile(nodeId) {
   }
 
   vscode.postMessage({ type: 'openFile', path: nodeId });
+}
+
+function getAllStaticToggles() {
+  return [
+    isolatedToggle,
+    testsToggle,
+    storiesToggle,
+    appEntryToggle,
+    routerToggle,
+    servicesToggle,
+    storesToggle,
+    composableTsToggle,
+    viewComponentsToggle
+  ].filter(Boolean);
+}
+
+function saveCheckboxStates() {
+  preSelectionCheckboxState.clear();
+  for (const toggle of getAllStaticToggles()) {
+    preSelectionCheckboxState.set(toggle.id, toggle.checked);
+  }
+}
+
+function setAllCheckboxesChecked() {
+  for (const toggle of getAllStaticToggles()) {
+    toggle.checked = true;
+  }
+}
+
+function restoreCheckboxStates() {
+  for (const toggle of getAllStaticToggles()) {
+    const saved = preSelectionCheckboxState.get(toggle.id);
+    if (saved !== undefined) {
+      toggle.checked = saved;
+    }
+  }
+}
+
+function selectNode(nodeId) {
+  if (selectedNodeId === nodeId) {
+    deselectNode();
+    return;
+  }
+
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node) {
+    return;
+  }
+
+  saveCheckboxStates();
+  selectedNodeId = nodeId;
+  setAllCheckboxesChecked();
+
+  if (selectedNodeBadgeName) {
+    selectedNodeBadgeName.textContent = node.path;
+  }
+  if (selectedNodeBadge) {
+    selectedNodeBadge.hidden = false;
+  }
+
+  rerenderGraphWithLayoutReset();
+}
+
+function deselectNode() {
+  selectedNodeId = null;
+  restoreCheckboxStates();
+
+  if (selectedNodeBadge) {
+    selectedNodeBadge.hidden = true;
+  }
+
+  rerenderGraphWithLayoutReset();
 }
 
 function updateNodeDom(nodeId) {
@@ -1106,6 +1224,10 @@ if (openGraphPanelButton) {
   openGraphPanelButton.addEventListener('click', () => {
     vscode?.postMessage({ type: 'openGraphPanel' });
   });
+}
+
+if (deselectNodeButton) {
+  deselectNodeButton.addEventListener('click', deselectNode);
 }
 
 renderComponentFolderToggles();
