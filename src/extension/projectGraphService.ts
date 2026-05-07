@@ -135,7 +135,8 @@ function classifyGraphNodeColor(filePath: string, kind: ProjectGraphFileKind): P
 async function collectGraphFiles() {
   const uris = await Promise.all([
     vscode.workspace.findFiles('**/*.vue'),
-    vscode.workspace.findFiles('**/*.ts')
+    vscode.workspace.findFiles('**/*.ts'),
+    vscode.workspace.findFiles('**/*.js')
   ]);
 
   const seenPaths = new Set<string>();
@@ -371,22 +372,41 @@ function isGraphFile(uri: vscode.Uri) {
   }
 
   const normalizedPath = normalizeFsPath(uri.fsPath);
-  const fileName = path.basename(normalizedPath).toLowerCase();
+  const normalizedLowerPath = normalizedPath.toLowerCase();
   if (normalizedPath.endsWith('.d.ts')) {
     return false;
   }
 
-  if (fileName === 'spec.ts' || fileName.endsWith('.spec.ts')) {
-    return false;
-  }
-
   const extension = path.extname(normalizedPath);
-  if (extension !== '.vue' && extension !== '.ts') {
+  if (extension === '.js') {
+    if (!isTestOrStoryFile(normalizedLowerPath)) {
+      return false;
+    }
+  } else if (extension !== '.vue' && extension !== '.ts') {
     return false;
   }
 
   const segments = normalizedPath.split(path.sep);
   return !segments.some((segment) => GRAPH_IGNORED_SEGMENTS.has(segment));
+}
+
+function isTestOrStoryFile(normalizedLowerPath: string) {
+  const segments = normalizedLowerPath.split(path.sep);
+  const fileName = path.basename(normalizedLowerPath);
+
+  return segments.includes('__tests__')
+    || segments.includes('.storybook')
+    || segments.includes('.histoire')
+    || fileName === 'spec.js'
+    || fileName.startsWith('histoire.')
+    || normalizedLowerPath.endsWith('.spec.ts')
+    || normalizedLowerPath.endsWith('.spec.js')
+    || normalizedLowerPath.endsWith('.stories.ts')
+    || normalizedLowerPath.endsWith('.stories.js')
+    || normalizedLowerPath.endsWith('.stories.vue')
+    || normalizedLowerPath.endsWith('.story.ts')
+    || normalizedLowerPath.endsWith('.story.js')
+    || normalizedLowerPath.endsWith('.story.vue');
 }
 
 function getFileKind(uri: vscode.Uri): ProjectGraphFileKind {

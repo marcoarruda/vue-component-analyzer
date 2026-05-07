@@ -3,6 +3,8 @@ const graphPayloadElement = document.getElementById('graph-payload');
 const graphCanvas = document.getElementById('graph-canvas');
 const emptyState = document.getElementById('empty-state');
 const isolatedToggle = document.getElementById('isolated-toggle');
+const testsToggle = document.getElementById('tests-toggle');
+const storiesToggle = document.getElementById('stories-toggle');
 const appEntryToggle = document.getElementById('app-entry-toggle');
 const routerToggle = document.getElementById('router-toggle');
 const servicesToggle = document.getElementById('services-toggle');
@@ -53,6 +55,7 @@ const interactionState = {
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 4;
 const DRAG_THRESHOLD = 4;
+const VERTICAL_LAYOUT_MULTIPLIER = 2;
 
 if (graphCanvas) {
   graphCanvas.addEventListener('pointerdown', handlePointerDown);
@@ -78,6 +81,8 @@ function parsePayload(payloadElement) {
 
 function updateVisibleGraph() {
   const hideIsolated = Boolean(isolatedToggle?.checked);
+  const showTests = Boolean(testsToggle?.checked);
+  const showStories = Boolean(storiesToggle?.checked);
   const showAppEntries = Boolean(appEntryToggle?.checked);
   const showRouter = Boolean(routerToggle?.checked);
   const showServices = Boolean(servicesToggle?.checked);
@@ -93,6 +98,14 @@ function updateVisibleGraph() {
 
   visibleNodes = graph.nodes.filter((node) => {
     if (!isComponentFolderVisible(node)) {
+      return false;
+    }
+
+    if (!showTests && isTestNode(node)) {
+      return false;
+    }
+
+    if (!showStories && isStorybookOrHistoireNode(node)) {
       return false;
     }
 
@@ -152,6 +165,34 @@ function isRouterNode(node) {
 
 function isAppEntryNode(node) {
   return node.path === 'src/App.vue' || node.path === 'src/main.ts';
+}
+
+function isTestNode(node) {
+  const normalizedPath = normalizeNodePath(node).toLowerCase();
+  const pathSegments = normalizedPath.split('/');
+  const fileName = pathSegments[pathSegments.length - 1];
+
+  return pathSegments.includes('__tests__')
+    || fileName === 'spec.ts'
+    || fileName === 'spec.js'
+    || normalizedPath.endsWith('.spec.ts')
+    || normalizedPath.endsWith('.spec.js');
+}
+
+function isStorybookOrHistoireNode(node) {
+  const normalizedPath = normalizeNodePath(node).toLowerCase();
+  const pathSegments = normalizedPath.split('/');
+  const fileName = pathSegments[pathSegments.length - 1];
+
+  return pathSegments.includes('.storybook')
+    || pathSegments.includes('.histoire')
+    || fileName.startsWith('histoire.')
+    || normalizedPath.endsWith('.stories.ts')
+    || normalizedPath.endsWith('.stories.js')
+    || normalizedPath.endsWith('.stories.vue')
+    || normalizedPath.endsWith('.story.ts')
+    || normalizedPath.endsWith('.story.js')
+    || normalizedPath.endsWith('.story.vue');
 }
 
 function isServiceNode(node) {
@@ -293,6 +334,11 @@ function createLayout(nodes, width, height) {
     return 'other';
   }
 
+  function isGroupIndexNode(node, group) {
+    const normalizedPath = pathAfterSrc(node);
+    return normalizedPath.startsWith(group + '/') && normalizedPath.endsWith('/index.ts');
+  }
+
   const positions = new Map();
   const topPadding = 90;
   const bottomPadding = 90;
@@ -300,11 +346,17 @@ function createLayout(nodes, width, height) {
   const rightPadding = 90;
   const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
   const availableWidth = Math.max(width - leftPadding - rightPadding, 1);
+  const routerNodes = nodes.filter((node) => classifyNode(node) === 'router').sort(compareNodes);
+  const serviceNodes = nodes.filter((node) => classifyNode(node) === 'service').sort(compareNodes);
+  const storeNodes = nodes.filter((node) => classifyNode(node) === 'store').sort(compareNodes);
   const groupedNodes = {
     root: nodes.filter((node) => classifyNode(node) === 'root').sort(compareNodes),
-    router: nodes.filter((node) => classifyNode(node) === 'router').sort(compareNodes),
-    service: nodes.filter((node) => classifyNode(node) === 'service').sort(compareNodes),
-    store: nodes.filter((node) => classifyNode(node) === 'store').sort(compareNodes),
+    routerIndex: routerNodes.filter((node) => isGroupIndexNode(node, 'router')),
+    router: routerNodes.filter((node) => !isGroupIndexNode(node, 'router')),
+    serviceIndex: serviceNodes.filter((node) => isGroupIndexNode(node, 'services')),
+    service: serviceNodes.filter((node) => !isGroupIndexNode(node, 'services')),
+    storeIndex: storeNodes.filter((node) => isGroupIndexNode(node, 'stores')),
+    store: storeNodes.filter((node) => !isGroupIndexNode(node, 'stores')),
     other: nodes.filter((node) => classifyNode(node) === 'other').sort((left, right) => {
       const levelDelta = (levelByNodeId.get(left.id) || 0) - (levelByNodeId.get(right.id) || 0);
       if (levelDelta !== 0) {
@@ -337,12 +389,20 @@ function createLayout(nodes, width, height) {
   const otherLevels = groupedNodes.other.map((node) => levelByNodeId.get(node.id) || 0);
 
   const maxOtherLevel = otherLevels.length > 0 ? Math.max(...otherLevels) : 0;
+  const hasRouterIndexNodes = groupedNodes.routerIndex.length > 0;
+  const hasRouterNodes = groupedNodes.router.length > 0;
   const hasRouterConnectedViews = routerConnectedViews.length > 0;
-  const serviceStoreRowIndex = hasRouterConnectedViews ? 3 : 2;
-  const otherRowBaseIndex = hasRouterConnectedViews ? 4 : 3;
+  const hasServiceStoreIndexNodes = groupedNodes.serviceIndex.length > 0 || groupedNodes.storeIndex.length > 0;
+  let nextRowIndex = 1;
+  const routerIndexRowIndex = hasRouterIndexNodes ? nextRowIndex++ : null;
+  const routerRowIndex = hasRouterNodes ? nextRowIndex++ : null;
+  const routerConnectedViewsRowIndex = hasRouterConnectedViews ? nextRowIndex++ : null;
+  const serviceStoreIndexRowIndex = hasServiceStoreIndexNodes ? nextRowIndex++ : null;
+  const serviceStoreRowIndex = nextRowIndex++;
+  const otherRowBaseIndex = nextRowIndex;
   const otherRowCount = Math.max(1, maxOtherLevel + 1);
   const rowCount = otherRowBaseIndex + otherRowCount;
-  const rowGap = rowCount > 1 ? availableHeight / (rowCount - 1) : 0;
+  const rowGap = rowCount > 1 ? (availableHeight * VERTICAL_LAYOUT_MULTIPLIER) / (rowCount - 1) : 0;
 
   function placeNodesHorizontally(bucketNodes, rowIndex, startX, laneWidth) {
     if (bucketNodes.length === 0) {
@@ -389,9 +449,18 @@ function createLayout(nodes, width, height) {
   }
 
   placeNodesHorizontally(groupedNodes.root, 0, width * 0.3, width * 0.4);
-  placeNodesHorizontally(groupedNodes.router, 1, width * 0.28, width * 0.44);
-  if (hasRouterConnectedViews) {
-    placeNodesHorizontally(routerConnectedViews, 2, leftPadding, availableWidth);
+  if (routerIndexRowIndex !== null) {
+    placeNodesHorizontally(groupedNodes.routerIndex, routerIndexRowIndex, width * 0.28, width * 0.44);
+  }
+  if (routerRowIndex !== null) {
+    placeNodesHorizontally(groupedNodes.router, routerRowIndex, width * 0.28, width * 0.44);
+  }
+  if (routerConnectedViewsRowIndex !== null) {
+    placeNodesHorizontally(routerConnectedViews, routerConnectedViewsRowIndex, leftPadding, availableWidth);
+  }
+  if (serviceStoreIndexRowIndex !== null) {
+    placeNodesHorizontally(groupedNodes.serviceIndex, serviceStoreIndexRowIndex, leftPadding, availableWidth * 0.34);
+    placeNodesHorizontally(groupedNodes.storeIndex, serviceStoreIndexRowIndex, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
   }
   placeNodesHorizontally(groupedNodes.service, serviceStoreRowIndex, leftPadding, availableWidth * 0.34);
   placeNodesHorizontally(groupedNodes.store, serviceStoreRowIndex, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
@@ -477,10 +546,8 @@ function fitViewportToVisibleGraph() {
   const viewBox = currentViewBox();
   const padding = 48;
   const availableWidth = Math.max(viewBox.width - padding * 2, 1);
-  const availableHeight = Math.max(viewBox.height - padding * 2, 1);
   const graphWidth = Math.max(bounds.maxX - bounds.minX, 1);
-  const graphHeight = Math.max(bounds.maxY - bounds.minY, 1);
-  const fitScale = Math.min(availableWidth / graphWidth, availableHeight / graphHeight);
+  const fitScale = availableWidth / graphWidth;
   const nextScale = clamp(Math.min(1, fitScale), MIN_SCALE, MAX_SCALE);
   const graphCenterX = (bounds.minX + bounds.maxX) / 2;
   const graphCenterY = (bounds.minY + bounds.maxY) / 2;
@@ -973,6 +1040,14 @@ function escapeHtml(value) {
 
 if (isolatedToggle) {
   isolatedToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (testsToggle) {
+  testsToggle.addEventListener('change', rerenderGraphWithLayoutReset);
+}
+
+if (storiesToggle) {
+  storiesToggle.addEventListener('change', rerenderGraphWithLayoutReset);
 }
 
 if (appEntryToggle) {
