@@ -66,6 +66,45 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
     }
   }
 
+  // Nuxt component auto-imports: components/ files can be used in templates without explicit imports
+  const isNuxtProject = workspaceFolders.some((f) => detectNuxtAppRoot(f.uri.fsPath) !== undefined);
+  if (isNuxtProject) {
+    const nuxtComponentMap = buildNuxtComponentMap(files);
+    const connectedPairs = new Set(
+      Array.from(edgesById.values()).map((e) => `${e.source}::${e.target}`)
+    );
+
+    for (const file of files) {
+      if (file.kind !== 'vue') {
+        continue;
+      }
+
+      for (const componentName of extractTemplateComponentTags(file.source)) {
+        const target = nuxtComponentMap.get(componentName);
+        if (!target || target.id === file.id) {
+          continue;
+        }
+
+        const pairKey = `${file.id}::${target.id}`;
+        if (connectedPairs.has(pairKey)) {
+          continue;
+        }
+
+        connectedPairs.add(pairKey);
+        const edgeId = `${file.id}->${target.id}:import:${componentName}`;
+        edgesById.set(edgeId, {
+          id: edgeId,
+          source: file.id,
+          target: target.id,
+          kind: 'import',
+          specifier: componentName
+        });
+        outgoingCounts.set(file.id, (outgoingCounts.get(file.id) ?? 0) + 1);
+        incomingCounts.set(target.id, (incomingCounts.get(target.id) ?? 0) + 1);
+      }
+    }
+  }
+
   const nodesList: ProjectGraphNode[] = files.map((file) => ({
     id: file.id,
     label: path.posix.basename(file.id),
@@ -328,6 +367,71 @@ function resolveSpecifierToFsPath(importerFsPath: string, specifier: string, res
 }
 
 const NUXT_VIRTUAL_ROUTER_ID = '__nuxt-router__';
+
+function buildNuxtComponentMap(files: GraphFileEntry[]): Map<string, GraphFileEntry> {
+  const map = new Map<string, GraphFileEntry>();
+
+  for (const file of files) {
+    if (file.kind !== 'vue') {
+      continue;
+    }
+
+    const componentName = nuxtAutoImportComponentName(file.id);
+    if (componentName) {
+      map.set(componentName, file);
+    }
+  }
+
+  return map;
+}
+
+function nuxtAutoImportComponentName(workspacePath: string): string | undefined {
+  // Matches app/components/..., src/components/..., or components/...
+  const match = workspacePath.match(/^(?:app\/|src\/)?components\/(.+)\.vue$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const segments = match[1].split('/');
+  return segments.map((segment) => segmentToPascalCase(segment)).join('');
+}
+
+function extractTemplateComponentTags(source: string): Set<string> {
+  const sfc = parseSfc(source);
+  const templateContent = sfc.descriptor.template?.content;
+  if (!templateContent) {
+    return new Set();
+  }
+
+  const tags = new Set<string>();
+  // Match PascalCase tags (<MyComponent) and multi-segment kebab-case tags (<my-component)
+  const tagRegex = /<([A-Z][a-zA-Z0-9.]*|[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)+)[\s\/>]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(templateContent)) !== null) {
+    const rawTag = match[1];
+    const componentName = rawTag.includes('-') ? kebabToPascalCase(rawTag) : rawTag;
+    // Strip Lazy prefix added by Nuxt for lazy-loaded variants
+    const cleanName = componentName.startsWith('Lazy') ? componentName.slice(4) : componentName;
+    tags.add(cleanName);
+  }
+
+  return tags;
+}
+
+function segmentToPascalCase(segment: string): string {
+  return segment
+    .split(/[-_]/)
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ''))
+    .join('');
+}
+
+function kebabToPascalCase(kebab: string): string {
+  return kebab
+    .split('-')
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ''))
+    .join('');
+}
 
 function injectNuxtVirtualRouter(
   workspaceFolders: readonly vscode.WorkspaceFolder[],
