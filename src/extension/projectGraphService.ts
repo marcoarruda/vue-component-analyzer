@@ -446,40 +446,87 @@ function injectNuxtVirtualRouter(
     return;
   }
 
-  // Already has an explicit router — don't add a placeholder
+  // --- Virtual router node + page edges ---
   const hasExplicitRouter = nodes.some((node) => node.color === 'router');
-  if (hasExplicitRouter) {
+  if (!hasExplicitRouter) {
+    const pageNodes = nodes.filter((node) => node.color === 'view');
+
+    if (pageNodes.length > 0) {
+      const virtualRouterNode: ProjectGraphNode = {
+        id: NUXT_VIRTUAL_ROUTER_ID,
+        label: 'Nuxt Router',
+        path: NUXT_VIRTUAL_ROUTER_ID,
+        kind: 'ts',
+        color: 'router',
+        virtual: true,
+        importCount: pageNodes.length,
+        importedByCount: 0
+      };
+
+      nodes.push(virtualRouterNode);
+
+      for (const pageNode of pageNodes) {
+        const edgeId = `${NUXT_VIRTUAL_ROUTER_ID}->${pageNode.id}:import`;
+        edges.push({
+          id: edgeId,
+          source: NUXT_VIRTUAL_ROUTER_ID,
+          target: pageNode.id,
+          kind: 'import',
+          specifier: pageNode.path
+        });
+        pageNode.importedByCount++;
+      }
+    }
+  }
+
+  // --- app.vue virtual edges ---
+  const appVueNode = nodes.find((node) =>
+    node.path === 'app/app.vue' || node.path === 'app/App.vue'
+    || node.path === 'app.vue' || node.path === 'App.vue'
+  );
+
+  if (!appVueNode) {
     return;
   }
 
-  const pageNodes = nodes.filter((node) => node.color === 'view');
-  if (pageNodes.length === 0) {
-    return;
-  }
+  const existingTargets = new Set(edges.filter((e) => e.source === appVueNode.id).map((e) => e.target));
 
-  const virtualNode: ProjectGraphNode = {
-    id: NUXT_VIRTUAL_ROUTER_ID,
-    label: 'Nuxt Router',
-    path: NUXT_VIRTUAL_ROUTER_ID,
-    kind: 'ts',
-    color: 'router',
-    virtual: true,
-    importCount: pageNodes.length,
-    importedByCount: 0
-  };
-
-  nodes.push(virtualNode);
-
-  for (const pageNode of pageNodes) {
-    const edgeId = `${NUXT_VIRTUAL_ROUTER_ID}->${pageNode.id}:import`;
+  // app.vue → Nuxt Router (via <NuxtPage>)
+  const routerNode = nodes.find((node) => node.id === NUXT_VIRTUAL_ROUTER_ID || node.color === 'router');
+  if (routerNode && !existingTargets.has(routerNode.id)) {
     edges.push({
-      id: edgeId,
-      source: NUXT_VIRTUAL_ROUTER_ID,
-      target: pageNode.id,
+      id: `${appVueNode.id}->${routerNode.id}:import:NuxtPage`,
+      source: appVueNode.id,
+      target: routerNode.id,
       kind: 'import',
-      specifier: pageNode.path
+      specifier: 'NuxtPage'
     });
-    pageNode.importedByCount++;
+    existingTargets.add(routerNode.id);
+    appVueNode.importCount++;
+    routerNode.importedByCount++;
+  }
+
+  // app.vue → each layout (via <NuxtLayout>)
+  const layoutNodes = nodes.filter((node) => {
+    const normalizedPath = node.path.startsWith('app/') ? node.path.slice(4) : node.path;
+    return node.kind === 'vue' && normalizedPath.startsWith('layouts/');
+  });
+
+  for (const layoutNode of layoutNodes) {
+    if (existingTargets.has(layoutNode.id)) {
+      continue;
+    }
+
+    edges.push({
+      id: `${appVueNode.id}->${layoutNode.id}:import:NuxtLayout`,
+      source: appVueNode.id,
+      target: layoutNode.id,
+      kind: 'import',
+      specifier: 'NuxtLayout'
+    });
+    existingTargets.add(layoutNode.id);
+    appVueNode.importCount++;
+    layoutNode.importedByCount++;
   }
 }
 
