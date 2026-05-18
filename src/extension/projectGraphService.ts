@@ -392,7 +392,9 @@ function nuxtAutoImportComponentName(workspacePath: string): string | undefined 
     return undefined;
   }
 
-  const segments = match[1].split('/');
+  // Strip Nuxt mode suffixes (.client, .server) before computing the name
+  const relativePath = match[1].replace(/\.(client|server)$/, '');
+  const segments = relativePath.split('/');
   return segments.map((segment) => segmentToPascalCase(segment)).join('');
 }
 

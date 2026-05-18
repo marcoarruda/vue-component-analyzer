@@ -14,6 +14,7 @@ const viewComponentsToggle = document.getElementById('view-components-toggle');
 const componentFolderSection = document.getElementById('component-folder-section');
 const componentFolderToggles = document.getElementById('component-folder-toggles');
 const labelsToggle = document.getElementById('labels-toggle');
+const folderPathsToggle = document.getElementById('folder-paths-toggle');
 const zoomOutButton = document.getElementById('zoom-out-button');
 const zoomResetButton = document.getElementById('zoom-reset-button');
 const zoomInButton = document.getElementById('zoom-in-button');
@@ -40,7 +41,9 @@ const DEFAULT_CHECKBOX_STATE = new Map([
   ['services-toggle', false],
   ['stores-toggle', false],
   ['composable-ts-toggle', false],
-  ['view-components-toggle', true]
+  ['view-components-toggle', true],
+  ['labels-toggle', true],
+  ['folder-paths-toggle', false]
 ]);
 
 let visibleNodes = [];
@@ -181,6 +184,27 @@ function normalizeNodePath(node) {
   return node.path.replaceAll('\\', '/');
 }
 
+const SHORT_PATH_CATEGORY_PREFIXES = new Set([
+  'components', 'pages', 'views', 'layouts', 'stores',
+  'composables', 'services', 'utils', 'router', 'middleware'
+]);
+
+function shortNodePath(node) {
+  const normalizedPath = normalizeNodePath(node);
+  let relativePath = normalizedPath;
+  if (relativePath.startsWith('app/') || relativePath.startsWith('src/')) {
+    relativePath = relativePath.slice(4);
+  }
+  const slashIdx = relativePath.indexOf('/');
+  if (slashIdx !== -1) {
+    const firstSegment = relativePath.slice(0, slashIdx);
+    if (SHORT_PATH_CATEGORY_PREFIXES.has(firstSegment)) {
+      return relativePath.slice(slashIdx + 1);
+    }
+  }
+  return relativePath;
+}
+
 function pathAfterSrc(node) {
   const normalizedPath = normalizeNodePath(node);
   if (normalizedPath.startsWith('src/')) {
@@ -316,7 +340,7 @@ function createLayout(nodes, width, height) {
     incomingCountByNodeId.set(edge.target, (incomingCountByNodeId.get(edge.target) || 0) + 1);
   }
 
-  const preferredPaths = ['src/App.vue', 'src/main.ts'];
+  const preferredPaths = ['src/App.vue', 'src/main.ts', 'app/app.vue', 'app/App.vue'];
   const preferredPathRank = new Map(preferredPaths.map((path, index) => [path, index]));
   const levelByNodeId = new Map();
 
@@ -620,7 +644,8 @@ function fitViewportToVisibleGraph() {
   }
 
   const showLabels = Boolean(labelsToggle?.checked);
-  const bounds = getVisibleGraphBounds(showLabels);
+  const showFolderPaths = Boolean(folderPathsToggle?.checked);
+  const bounds = getVisibleGraphBounds(showLabels || showFolderPaths);
   const viewBox = currentViewBox();
   const padding = 48;
   const availableWidth = Math.max(viewBox.width - padding * 2, 1);
@@ -713,10 +738,11 @@ function renderGraph() {
   ensureNodePositions(visibleNodes, width, height);
   const positions = visiblePositions();
   const showLabels = Boolean(labelsToggle?.checked);
+  const showFolderPaths = Boolean(folderPathsToggle?.checked);
 
   graphCanvas.innerHTML = '<g id="graph-viewport" class="graph-viewport">'
     + renderEdges(visibleEdges, positions)
-    + renderNodes(visibleNodes, positions, showLabels)
+    + renderNodes(visibleNodes, positions, showLabels, showFolderPaths)
     + '</g>';
 
   viewportGroup = graphCanvas.querySelector('#graph-viewport');
@@ -771,6 +797,7 @@ function applyHoveredNodeState() {
 
   const hasHoveredNode = Boolean(hoveredNodeId) && visibleNodes.some((node) => node.id === hoveredNodeId);
   const showLabels = Boolean(labelsToggle?.checked);
+  const showFolderPaths = Boolean(folderPathsToggle?.checked);
   graphCanvas.classList.toggle('is-node-hovering', hasHoveredNode);
   const connectedEdges = hasHoveredNode ? connectedEdgesByNodeId.get(hoveredNodeId) || [] : [];
   const hoveredEdgeIds = new Set(connectedEdges.map((edge) => edge.id));
@@ -787,11 +814,14 @@ function applyHoveredNodeState() {
     const labelElement = nodeElement.querySelector('.graph-label');
     if (labelElement) {
       const shouldShowPath = isHovered || isConnected;
-      const defaultLabel = nodeElement.getAttribute('data-node-label') || '';
+      const shortPath = nodeElement.getAttribute('data-node-short-path') || '';
+      const defaultLabel = showFolderPaths
+        ? (shortPath || nodeElement.getAttribute('data-node-label') || '')
+        : (nodeElement.getAttribute('data-node-label') || '');
       const fullPath = nodeElement.getAttribute('data-node-path') || defaultLabel;
       labelElement.textContent = shouldShowPath ? fullPath : defaultLabel;
       labelElement.classList.toggle('graph-label--path', shouldShowPath);
-      labelElement.classList.toggle('is-hidden', !showLabels && !shouldShowPath);
+      labelElement.classList.toggle('is-hidden', !showLabels && !showFolderPaths && !shouldShowPath);
     }
   }
 
@@ -818,7 +848,7 @@ function renderEdges(edges, positions) {
   }).join('');
 }
 
-function renderNodes(nodes, positions, showLabels) {
+function renderNodes(nodes, positions, showLabels, showFolderPaths) {
   return nodes.map((node) => {
     const position = positions.get(node.id);
     if (!position) {
@@ -826,10 +856,13 @@ function renderNodes(nodes, positions, showLabels) {
     }
 
     const radius = radiusForNode(node);
-    const labelClassName = showLabels ? 'graph-label' : 'graph-label is-hidden';
-    const label = '<text class="' + labelClassName + '" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(node.label) + '</text>';
+    const shortPath = shortNodePath(node);
+    const displayLabel = showFolderPaths ? shortPath : node.label;
+    const labelHidden = !showLabels && !showFolderPaths;
+    const labelClassName = labelHidden ? 'graph-label is-hidden' : 'graph-label';
+    const label = '<text class="' + labelClassName + '" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(displayLabel) + '</text>';
 
-    return '<g class="graph-node graph-node--' + node.color + (node.virtual ? ' graph-node--virtual' : '') + '" data-node-id="' + escapeHtml(node.id) + '" data-node-label="' + escapeHtml(node.label) + '" data-node-path="' + escapeHtml(node.path) + '">'
+    return '<g class="graph-node graph-node--' + node.color + (node.virtual ? ' graph-node--virtual' : '') + '" data-node-id="' + escapeHtml(node.id) + '" data-node-label="' + escapeHtml(node.label) + '" data-node-path="' + escapeHtml(node.path) + '" data-node-short-path="' + escapeHtml(shortPath) + '">'
       + '<circle cx="' + position.x.toFixed(2) + '" cy="' + position.y.toFixed(2) + '" r="' + radius.toFixed(2) + '"></circle>'
       + label
       + '</g>';
@@ -1237,6 +1270,13 @@ if (labelsToggle) {
   });
 }
 
+if (folderPathsToggle) {
+  folderPathsToggle.addEventListener('change', () => {
+    shouldFitViewportOnRender = true;
+    renderGraph();
+  });
+}
+
 if (zoomOutButton) {
   zoomOutButton.addEventListener('click', () => {
     setZoom(viewportState.scale * 0.9);
@@ -1276,7 +1316,7 @@ for (const btn of document.querySelectorAll('.toggle-all-btn')) {
     const checked = btn.getAttribute('data-action') === 'all';
 
     if (section === 'graph') {
-      for (const id of ['isolated-toggle', 'labels-toggle', 'tests-toggle', 'stories-toggle']) {
+      for (const id of ['isolated-toggle', 'labels-toggle', 'folder-paths-toggle', 'tests-toggle', 'stories-toggle']) {
         const el = document.getElementById(id);
         if (el) { el.checked = checked; }
       }
