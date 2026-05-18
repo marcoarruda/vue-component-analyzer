@@ -183,15 +183,22 @@ function normalizeNodePath(node) {
 
 function pathAfterSrc(node) {
   const normalizedPath = normalizeNodePath(node);
-  return normalizedPath.startsWith('src/') ? normalizedPath.slice(4) : normalizedPath;
+  if (normalizedPath.startsWith('src/')) {
+    return normalizedPath.slice(4);
+  }
+  if (normalizedPath.startsWith('app/')) {
+    return normalizedPath.slice(4);
+  }
+  return normalizedPath;
 }
 
 function isRouterNode(node) {
-  return pathAfterSrc(node).startsWith('router/');
+  return node.id === '__nuxt-router__' || pathAfterSrc(node).startsWith('router/');
 }
 
 function isAppEntryNode(node) {
-  return node.path === 'src/App.vue' || node.path === 'src/main.ts';
+  return node.path === 'src/App.vue' || node.path === 'src/main.ts'
+    || node.path === 'app/app.vue' || node.path === 'app/App.vue';
 }
 
 function isTestNode(node) {
@@ -239,7 +246,8 @@ function isComposableTsNode(node) {
 }
 
 function isViewComponentNode(node) {
-  return /^views\/.*\/components\//.test(pathAfterSrc(node));
+  const relative = pathAfterSrc(node);
+  return /^views\/.*\/components\//.test(relative) || /^pages\/.*\/components\//.test(relative);
 }
 
 function componentFolderNameForNode(node) {
@@ -367,12 +375,22 @@ function createLayout(nodes, width, height) {
   assignLevelsFromRoots(remainingNodes);
 
   function pathAfterSrc(node) {
-    return node.path.startsWith('src/') ? node.path.slice(4) : node.path;
+    if (node.path.startsWith('src/')) {
+      return node.path.slice(4);
+    }
+    if (node.path.startsWith('app/')) {
+      return node.path.slice(4);
+    }
+    return node.path;
   }
 
   function classifyNode(node) {
     if (preferredPathRank.has(node.path)) {
       return 'root';
+    }
+
+    if (node.id === '__nuxt-router__') {
+      return 'router';
     }
 
     const normalizedPath = pathAfterSrc(node);
@@ -433,8 +451,11 @@ function createLayout(nodes, width, height) {
 
     const candidateId = sourceIsRouter ? edge.target : edge.source;
     const candidateNode = nodesById.get(candidateId);
-    if (candidateNode && pathAfterSrc(candidateNode).startsWith('views/')) {
-      routerConnectedViewIds.add(candidateNode.id);
+    if (candidateNode) {
+      const candidatePath = pathAfterSrc(candidateNode);
+      if (candidatePath.startsWith('views/') || candidatePath.startsWith('pages/')) {
+        routerConnectedViewIds.add(candidateNode.id);
+      }
     }
   }
 
@@ -808,7 +829,7 @@ function renderNodes(nodes, positions, showLabels) {
     const labelClassName = showLabels ? 'graph-label' : 'graph-label is-hidden';
     const label = '<text class="' + labelClassName + '" x="' + position.x.toFixed(2) + '" y="' + (position.y + radius + 16).toFixed(2) + '">' + escapeHtml(node.label) + '</text>';
 
-    return '<g class="graph-node graph-node--' + node.color + '" data-node-id="' + escapeHtml(node.id) + '" data-node-label="' + escapeHtml(node.label) + '" data-node-path="' + escapeHtml(node.path) + '">'
+    return '<g class="graph-node graph-node--' + node.color + (node.virtual ? ' graph-node--virtual' : '') + '" data-node-id="' + escapeHtml(node.id) + '" data-node-label="' + escapeHtml(node.label) + '" data-node-path="' + escapeHtml(node.path) + '">'
       + '<circle cx="' + position.x.toFixed(2) + '" cy="' + position.y.toFixed(2) + '" r="' + radius.toFixed(2) + '"></circle>'
       + label
       + '</g>';
@@ -936,6 +957,11 @@ function resetInteractionState() {
 
 function openNodeFile(nodeId) {
   if (!nodeId || !vscode) {
+    return;
+  }
+
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (node?.virtual) {
     return;
   }
 

@@ -34,7 +34,7 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
     return createEmptyGraphResult('Workspace');
   }
 
-  const files = await collectGraphFiles();
+  const files = await collectGraphFiles(workspaceFolders);
   const resolutionContexts = createResolutionContexts(workspaceFolders);
   const edgesById = new Map<string, ProjectGraphEdge>();
   const outgoingCounts = new Map<string, number>();
@@ -66,19 +66,23 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
     }
   }
 
-  const nodes: ProjectGraphNode[] = files
-    .map((file) => ({
-      id: file.id,
-      label: path.posix.basename(file.id),
-      path: file.id,
-      kind: file.kind,
-      color: classifyGraphNodeColor(file.id, file.kind),
-      importCount: outgoingCounts.get(file.id) ?? 0,
-      importedByCount: incomingCounts.get(file.id) ?? 0
-    }))
-    .sort((left, right) => left.path.localeCompare(right.path));
+  const nodesList: ProjectGraphNode[] = files.map((file) => ({
+    id: file.id,
+    label: path.posix.basename(file.id),
+    path: file.id,
+    kind: file.kind,
+    color: classifyGraphNodeColor(file.id, file.kind),
+    importCount: outgoingCounts.get(file.id) ?? 0,
+    importedByCount: incomingCounts.get(file.id) ?? 0
+  }));
 
-  const edges = Array.from(edgesById.values()).sort((left, right) => {
+  const edgesList: ProjectGraphEdge[] = Array.from(edgesById.values());
+
+  injectNuxtVirtualRouter(workspaceFolders, nodesList, edgesList);
+
+  const nodes = nodesList.sort((left, right) => left.path.localeCompare(right.path));
+
+  const edges = edgesList.sort((left, right) => {
     const sourceCompare = left.source.localeCompare(right.source);
     if (sourceCompare !== 0) {
       return sourceCompare;
@@ -135,7 +139,11 @@ function classifyGraphNodeColor(filePath: string, kind: ProjectGraphFileKind): P
   return kind === 'vue' ? 'vue' : 'ts';
 }
 
-async function collectGraphFiles() {
+async function collectGraphFiles(workspaceFolders: readonly vscode.WorkspaceFolder[]) {
+  const nuxtAppRootByWorkspace = new Map(
+    workspaceFolders.map((folder) => [folder.uri.fsPath, detectNuxtAppRoot(folder.uri.fsPath)])
+  );
+
   const uris = await Promise.all([
     vscode.workspace.findFiles('**/*.vue'),
     vscode.workspace.findFiles('**/*.ts'),
@@ -147,6 +155,10 @@ async function collectGraphFiles() {
 
   for (const uri of uris.flat()) {
     if (!isGraphFile(uri)) {
+      continue;
+    }
+
+    if (!isFileInNuxtAllowedPath(uri.fsPath, workspaceFolders, nuxtAppRootByWorkspace)) {
       continue;
     }
 
@@ -166,6 +178,30 @@ async function collectGraphFiles() {
   }
 
   return files;
+}
+
+function isFileInNuxtAllowedPath(
+  fsPath: string,
+  workspaceFolders: readonly vscode.WorkspaceFolder[],
+  nuxtAppRootByWorkspace: Map<string, string | undefined>
+) {
+  for (const folder of workspaceFolders) {
+    if (!isDescendantPath(fsPath, folder.uri.fsPath)) {
+      continue;
+    }
+
+    const nuxtAppRoot = nuxtAppRootByWorkspace.get(folder.uri.fsPath);
+
+    // Not a Nuxt project, or Nuxt 3 (app root == workspace root): allow all files
+    if (!nuxtAppRoot || nuxtAppRoot === folder.uri.fsPath) {
+      return true;
+    }
+
+    // Nuxt 4: only allow files under app/
+    return isDescendantPath(fsPath, nuxtAppRoot);
+  }
+
+  return true;
 }
 
 function extractGraphImports(file: GraphFileEntry) {
@@ -289,6 +325,58 @@ function resolveSpecifierToFsPath(importerFsPath: string, specifier: string, res
 
   const normalizedPath = normalizeFsPath(resolvedFileName);
   return normalizedPath.endsWith('.d.ts') ? undefined : normalizedPath;
+}
+
+const NUXT_VIRTUAL_ROUTER_ID = '__nuxt-router__';
+
+function injectNuxtVirtualRouter(
+  workspaceFolders: readonly vscode.WorkspaceFolder[],
+  nodes: ProjectGraphNode[],
+  edges: ProjectGraphEdge[]
+) {
+  const isNuxtProject = workspaceFolders.some(
+    (folder) => detectNuxtAppRoot(folder.uri.fsPath) !== undefined
+  );
+
+  if (!isNuxtProject) {
+    return;
+  }
+
+  // Already has an explicit router — don't add a placeholder
+  const hasExplicitRouter = nodes.some((node) => node.color === 'router');
+  if (hasExplicitRouter) {
+    return;
+  }
+
+  const pageNodes = nodes.filter((node) => node.color === 'view');
+  if (pageNodes.length === 0) {
+    return;
+  }
+
+  const virtualNode: ProjectGraphNode = {
+    id: NUXT_VIRTUAL_ROUTER_ID,
+    label: 'Nuxt Router',
+    path: NUXT_VIRTUAL_ROUTER_ID,
+    kind: 'ts',
+    color: 'router',
+    virtual: true,
+    importCount: pageNodes.length,
+    importedByCount: 0
+  };
+
+  nodes.push(virtualNode);
+
+  for (const pageNode of pageNodes) {
+    const edgeId = `${NUXT_VIRTUAL_ROUTER_ID}->${pageNode.id}:import`;
+    edges.push({
+      id: edgeId,
+      source: NUXT_VIRTUAL_ROUTER_ID,
+      target: pageNode.id,
+      kind: 'import',
+      specifier: pageNode.path
+    });
+    pageNode.importedByCount++;
+  }
 }
 
 function detectNuxtAppRoot(workspaceRoot: string): string | undefined {

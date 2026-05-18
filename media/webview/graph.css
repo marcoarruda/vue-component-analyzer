@@ -550,6 +550,11 @@ body:not(.graph-layout--sidebar) .graph-launch-panel {
   --node-glow-color: var(--node-router-glow);
 }
 
+.graph-node--virtual circle {
+  stroke-dasharray: 8 4;
+  fill: transparent;
+}
+
 .graph-label {
   fill: var(--text);
   font-size: 12px;

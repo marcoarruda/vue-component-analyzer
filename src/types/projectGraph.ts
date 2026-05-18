@@ -12,6 +12,7 @@ export interface ProjectGraphNode {
   color: ProjectGraphNodeColor;
   importCount: number;
   importedByCount: number;
+  virtual?: boolean;
 }
 
 export interface ProjectGraphEdge {
