@@ -25,7 +25,7 @@ interface GraphResolutionContext {
 }
 
 const GRAPH_FILE_EXTENSIONS = ['.vue', '.ts'] as const;
-const GRAPH_IGNORED_SEGMENTS = new Set(['node_modules', '.git', 'dist', 'out', 'coverage']);
+const GRAPH_IGNORED_SEGMENTS = new Set(['node_modules', '.git', 'dist', 'out', 'coverage', '.nuxt', '.output', '.cache']);
 
 export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -107,7 +107,10 @@ export async function buildWorkspaceProjectGraph(): Promise<ProjectGraphResult> 
 }
 
 function classifyGraphNodeColor(filePath: string, kind: ProjectGraphFileKind): ProjectGraphNodeColor {
-  const normalizedPath = filePath.startsWith('src/') ? filePath.slice(4) : filePath;
+  let normalizedPath = filePath;
+  if (normalizedPath.startsWith('src/') || normalizedPath.startsWith('app/')) {
+    normalizedPath = normalizedPath.slice(4);
+  }
 
   if (normalizedPath.startsWith('stores/')) {
     return 'store';
@@ -117,7 +120,7 @@ function classifyGraphNodeColor(filePath: string, kind: ProjectGraphFileKind): P
     return 'service';
   }
 
-  if (normalizedPath.startsWith('views/')) {
+  if (normalizedPath.startsWith('views/') || normalizedPath.startsWith('pages/')) {
     return 'view';
   }
 
@@ -288,12 +291,39 @@ function resolveSpecifierToFsPath(importerFsPath: string, specifier: string, res
   return normalizedPath.endsWith('.d.ts') ? undefined : normalizedPath;
 }
 
-function resolveAliasBasePath(specifier: string, workspaceRoot: string) {
-  if (!specifier.startsWith('@/')) {
+function detectNuxtAppRoot(workspaceRoot: string): string | undefined {
+  const hasNuxtConfig = ts.sys.fileExists(path.join(workspaceRoot, 'nuxt.config.ts'))
+    || ts.sys.fileExists(path.join(workspaceRoot, 'nuxt.config.js'))
+    || ts.sys.fileExists(path.join(workspaceRoot, 'nuxt.config.mts'))
+    || ts.sys.fileExists(path.join(workspaceRoot, 'nuxt.config.mjs'));
+
+  if (!hasNuxtConfig) {
     return undefined;
   }
 
-  return path.join(workspaceRoot, 'src', specifier.slice(2));
+  // Nuxt 4 default: source lives under app/
+  if (ts.sys.directoryExists(path.join(workspaceRoot, 'app'))) {
+    return path.join(workspaceRoot, 'app');
+  }
+
+  // Nuxt 3: aliases point to the project root
+  return workspaceRoot;
+}
+
+function resolveAliasBasePath(specifier: string, workspaceRoot: string) {
+  // ~~ and @@ always resolve to the project root in both Nuxt 3 and 4
+  if (specifier.startsWith('~~/') || specifier.startsWith('@@/')) {
+    return path.join(workspaceRoot, specifier.slice(3));
+  }
+
+  // @ and ~ resolve to the Nuxt app directory (app/ in Nuxt 4, root in Nuxt 3, src/ otherwise)
+  if (specifier.startsWith('@/') || specifier.startsWith('~/')) {
+    const nuxtAppRoot = detectNuxtAppRoot(workspaceRoot);
+    const appRoot = nuxtAppRoot ?? path.join(workspaceRoot, 'src');
+    return path.join(appRoot, specifier.slice(2));
+  }
+
+  return undefined;
 }
 
 function createResolutionContexts(workspaceFolders: readonly vscode.WorkspaceFolder[]) {
@@ -320,16 +350,30 @@ function createResolutionContexts(workspaceFolders: readonly vscode.WorkspaceFol
 }
 
 function createFallbackResolutionContext(workspaceFolder: vscode.WorkspaceFolder): GraphResolutionContext {
+  const workspaceRoot = workspaceFolder.uri.fsPath;
+  const nuxtAppRoot = detectNuxtAppRoot(workspaceRoot);
+  const appAliasGlob = nuxtAppRoot
+    ? path.relative(workspaceRoot, nuxtAppRoot).replace(/\\/g, '/') + '/*'
+    : 'src/*';
+
+  const paths: Record<string, string[]> = {
+    '@/*': [appAliasGlob],
+    '~/*': [appAliasGlob]
+  };
+
+  if (nuxtAppRoot) {
+    paths['@@/*'] = ['*'];
+    paths['~~/*'] = ['*'];
+  }
+
   return {
     compilerOptions: {
       allowJs: true,
       jsx: ts.JsxEmit.Preserve,
       module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.Bundler,
-      baseUrl: workspaceFolder.uri.fsPath,
-      paths: {
-        '@/*': ['src/*']
-      }
+      baseUrl: workspaceRoot,
+      paths
     },
     host: ts.sys,
     workspaceFolder
