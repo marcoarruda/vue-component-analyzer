@@ -70,6 +70,11 @@ body.graph-layout--sidebar .shell {
 }
 
 body.graph-layout--sidebar .hero {
+  display: block;
+  padding: 14px;
+}
+
+body.graph-layout--sidebar .hero > div:first-child {
   display: none;
 }
 
@@ -281,7 +286,7 @@ body.graph-layout--sidebar .controls-panel {
 }
 
 body.graph-layout--sidebar .graph-panel {
-  min-height: 460px;
+  display: none;
 }
 
 .graph-stage {
@@ -298,10 +303,6 @@ body.graph-layout--sidebar .graph-panel {
   display: block;
   cursor: grab;
   touch-action: none;
-}
-
-body.graph-layout--sidebar .graph-stage {
-  min-height: 460px;
 }
 
 .graph-canvas.is-panning {

@@ -384,15 +384,17 @@
     "views": {
       "vueComponentAnalyzer": [
         {
-          "id": "vueComponentAnalyzer.components",
-          "name": "Vue Components",
-          "icon": "media/logo-sidebar.svg"
-        },
-        {
           "type": "webview",
           "id": "vueComponentAnalyzer.projectGraph",
           "name": "Project Graph",
-          "icon": "media/project-graph-dark.svg"
+          "icon": "media/project-graph-dark.svg",
+          "visibility": "visible"
+        },
+        {
+          "id": "vueComponentAnalyzer.components",
+          "name": "Vue Components",
+          "icon": "media/logo-sidebar.svg",
+          "visibility": "visible"
         }
       ]
     }
