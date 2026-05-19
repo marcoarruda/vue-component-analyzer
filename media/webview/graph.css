@@ -629,7 +629,7 @@ body:not(.graph-layout--sidebar) .graph-launch-panel {
 }
 
 .stats-panel {
-  padding: 0 24px 24px;
+  padding: 24px;
 }
 
 .stats--expanded {
