@@ -457,20 +457,25 @@ function createLayout(nodes, width, height) {
   const availableWidth = Math.max(width - leftPadding - rightPadding, 1);
   const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
   // Per-gap vertical spacing: gap between level i and i+1 is weighted by the
-  // maximum number of direct children any single node in level i sends to
-  // level i+1.  Gaps with denser fan-out get proportionally more room.
-  // All weights are normalised so the total height stays constant.
+  // total number of nodes in the destination level.  Levels that receive more
+  // children spread out more and need proportionally more vertical room.
+  // We also factor in the max fan-out from a single parent so that one-to-many
+  // relationships still pull the levels apart even when the destination row is
+  // small.  Both components are normalised together so total height is stable.
   const gapWeights = sortedLevels.slice(0, -1).map((fromLevel, i) => {
     const toLevel = sortedLevels[i + 1];
-    const row = rowsByLevel.get(fromLevel);
-    const nodesAtFrom = [...row.left, ...row.center, ...row.right];
+    const fromRow = rowsByLevel.get(fromLevel);
+    const toRow = rowsByLevel.get(toLevel);
+    const nodesAtFrom = [...fromRow.left, ...fromRow.center, ...fromRow.right];
+    const nodesAtTo = [...toRow.left, ...toRow.center, ...toRow.right];
     let maxChildren = 1;
     for (const node of nodesAtFrom) {
       const count = (outgoingByNode.get(node.id) ?? [])
         .filter((id) => levelByNode.get(id) === toLevel).length;
       if (count > maxChildren) maxChildren = count;
     }
-    return maxChildren;
+    // Use the larger of: total destination-row size vs max single-parent fan-out
+    return Math.max(nodesAtTo.length, maxChildren);
   });
   const totalGapWeight = gapWeights.reduce((s, w) => s + w, 0) || 1;
   const totalVerticalSpace = rowCount > 1 ? availableHeight * VERTICAL_LAYOUT_MULTIPLIER : 0;
