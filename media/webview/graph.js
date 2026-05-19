@@ -17,6 +17,7 @@ const labelsToggle = document.getElementById('labels-toggle');
 const folderPathsToggle = document.getElementById('folder-paths-toggle');
 const zoomOutButton = document.getElementById('zoom-out-button');
 const zoomResetButton = document.getElementById('zoom-reset-button');
+const fitViewportButton = document.getElementById('fit-viewport-button');
 const zoomInButton = document.getElementById('zoom-in-button');
 const openGraphPanelButton = document.getElementById('open-graph-panel-button');
 const selectedNodeBadge = document.getElementById('selected-node-badge');
@@ -75,7 +76,8 @@ const interactionState = {
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 4;
 const DRAG_THRESHOLD = 4;
-const VERTICAL_LAYOUT_MULTIPLIER = 2;
+const VERTICAL_LAYOUT_MULTIPLIER = 1;
+const HORIZONTAL_NODE_GAP_MULTIPLIER = 4.4;
 
 if (graphCanvas) {
   graphCanvas.addEventListener('pointerdown', handlePointerDown);
@@ -454,7 +456,28 @@ function createLayout(nodes, width, height) {
   const rightPadding = 90;
   const availableWidth = Math.max(width - leftPadding - rightPadding, 1);
   const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
-  const rowGap = rowCount > 1 ? (availableHeight * VERTICAL_LAYOUT_MULTIPLIER) / (rowCount - 1) : 0;
+  // Per-gap vertical spacing: gap between level i and i+1 is weighted by the
+  // maximum number of direct children any single node in level i sends to
+  // level i+1.  Gaps with denser fan-out get proportionally more room.
+  // All weights are normalised so the total height stays constant.
+  const gapWeights = sortedLevels.slice(0, -1).map((fromLevel, i) => {
+    const toLevel = sortedLevels[i + 1];
+    const row = rowsByLevel.get(fromLevel);
+    const nodesAtFrom = [...row.left, ...row.center, ...row.right];
+    let maxChildren = 1;
+    for (const node of nodesAtFrom) {
+      const count = (outgoingByNode.get(node.id) ?? [])
+        .filter((id) => levelByNode.get(id) === toLevel).length;
+      if (count > maxChildren) maxChildren = count;
+    }
+    return maxChildren;
+  });
+  const totalGapWeight = gapWeights.reduce((s, w) => s + w, 0) || 1;
+  const totalVerticalSpace = rowCount > 1 ? availableHeight * VERTICAL_LAYOUT_MULTIPLIER : 0;
+  const cumulativeY = [0];
+  for (let gi = 0; gi < gapWeights.length; gi++) {
+    cumulativeY.push(cumulativeY[gi] + totalVerticalSpace * (gapWeights[gi] / totalGapWeight));
+  }
 
   const hasAnyLeft = nodes.some((n) => getZone(n) === 'left');
   const hasAnyRight = nodes.some((n) => getZone(n) === 'right');
@@ -509,8 +532,8 @@ function createLayout(nodes, width, height) {
       return;
     }
 
-    // Minimum separation between adjacent centres (×2.2 avoids visual overlap)
-    const minSep = radii.slice(0, -1).map((_, i) => (radii[i] + radii[i + 1]) * 2.2);
+    // Minimum separation between adjacent centres
+    const minSep = radii.slice(0, -1).map((_, i) => (radii[i] + radii[i + 1]) * HORIZONTAL_NODE_GAP_MULTIPLIER);
 
     // Build ideal X array; fill nulls by neighbour interpolation
     const idealArr = sorted.map((node) => idealByNode.get(node.id) ?? null);
@@ -520,8 +543,8 @@ function createLayout(nodes, width, height) {
         const prev = i - d >= 0 ? idealArr[i - d] : null;
         const next = i + d < sorted.length ? idealArr[i + d] : null;
         if (prev !== null && next !== null) return (prev + next) / 2;
-        if (prev !== null) return prev + d * 55;
-        if (next !== null) return next - d * 55;
+        if (prev !== null) return prev + d * 110;
+        if (next !== null) return next - d * 110;
       }
       return laneCenter;
     });
@@ -571,7 +594,7 @@ function createLayout(nodes, width, height) {
 
   sortedLevels.forEach((level, rowIndex) => {
     const row = rowsByLevel.get(level);
-    const y = topPadding + rowGap * rowIndex;
+    const y = topPadding + cumulativeY[rowIndex];
     placeRow(row.center, y, centerZoneStart, centerZoneWidth);
     if (hasAnyLeft) placeRow(row.left, y, leftPadding, sideZoneWidth);
     if (hasAnyRight) placeRow(row.right, y, rightZoneStart, sideZoneWidth);
@@ -1279,6 +1302,13 @@ if (folderPathsToggle) {
 if (zoomOutButton) {
   zoomOutButton.addEventListener('click', () => {
     setZoom(viewportState.scale * 0.9);
+  });
+}
+
+if (fitViewportButton) {
+  fitViewportButton.addEventListener('click', () => {
+    shouldFitViewportOnRender = true;
+    renderGraph();
   });
 }
 
