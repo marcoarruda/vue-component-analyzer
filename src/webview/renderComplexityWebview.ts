@@ -20,6 +20,7 @@ export function renderComplexityWebview(
   const inputTotal = analysis.external.props.length + analysis.external.models.length + analysis.external.slots.length;
   const injectTotal = analysis.external.injects.length;
   const storeTotal = analysis.external.stores.length;
+  const routerTotal = analysis.external.router.length;
   const provideTotal = analysis.external.provides.length;
   const outputTotal = analysis.external.emits.length + analysis.external.exposed.length + analysis.external.slotProps.length;
   const internalTotal = analysis.internal.refs.length + analysis.internal.computed.length + analysis.internal.watchers.length;
@@ -44,6 +45,8 @@ export function renderComplexityWebview(
     .replaceAll('{{INJECT_METRICS}}', renderMetric('Injected', 'injects', detailPayload.injects.items))
     .replaceAll('{{STORE_TOTAL}}', String(storeTotal))
     .replaceAll('{{STORE_METRICS}}', renderMetric('Stores', 'stores', detailPayload.stores.items))
+    .replaceAll('{{ROUTER_TOTAL}}', String(routerTotal))
+    .replaceAll('{{ROUTER_METRICS}}', renderMetric('Router', 'router', detailPayload.router.items))
     .replaceAll('{{INPUT_TOTAL}}', String(inputTotal))
     .replaceAll(
       '{{INPUT_METRICS}}',
@@ -109,6 +112,11 @@ function createDetailPayload(analysis: ComponentAnalysisResult): Record<string, 
       title: 'Stores',
       emptyLabel: 'No stores were detected.',
       items: analysis.details.external.stores
+    },
+    router: {
+      title: 'Router',
+      emptyLabel: 'No router composables were detected.',
+      items: analysis.details.external.router
     },
     refs: {
       title: 'Refs',

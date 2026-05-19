@@ -60,6 +60,19 @@ function connectorPoints(fromKey, toKey, fromRect, toRect) {
     };
   }
 
+  if (fromKey === 'external-source-router' && toKey === 'component') {
+    return {
+      start: {
+        x: fromRect.right,
+        y: fromRect.bottom
+      },
+      end: {
+        x: toRect.left,
+        y: toRect.top
+      }
+    };
+  }
+
   return {
     start: anchorPoint(fromRect, toRect),
     end: anchorPoint(toRect, fromRect)

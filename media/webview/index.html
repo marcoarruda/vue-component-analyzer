@@ -30,9 +30,16 @@
               <line data-from="inputs" data-to="component" stroke="var(--inputs)"></line>
               <line data-from="external-source" data-to="component" stroke="var(--external-sources)"></line>
               <line data-from="external-source-store" data-to="component" stroke="var(--external-sources-alt)"></line>
+              <line data-from="external-source-router" data-to="component" stroke="var(--router)"></line>
               <line data-from="component" data-to="outputs" stroke="var(--outputs)"></line>
               <line data-from="component" data-to="external-source-provide" stroke="var(--external-sources)"></line>
             </svg>
+
+            <section class="cluster external-source-router" data-node="external-source-router">
+              <div class="cluster-title">Router</div>
+              <div class="cluster-total">{{ROUTER_TOTAL}}</div>
+              <div class="metric-list">{{ROUTER_METRICS}}</div>
+            </section>
 
             <section class="cluster external-source" data-node="external-source">
               <div class="cluster-title">Injected</div>

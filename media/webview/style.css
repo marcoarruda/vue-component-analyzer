@@ -12,6 +12,8 @@
   --external-sources-glow: rgba(66, 184, 131, 0.34);
   --external-sources-alt: #f2c94c;
   --external-sources-alt-glow: rgba(242, 201, 76, 0.32);
+  --router: #a78bfa;
+  --router-glow: rgba(167, 139, 250, 0.32);
   --outputs: #f2994a;
   --outputs-glow: rgba(242, 153, 74, 0.28);
 }
@@ -150,7 +152,7 @@ h2 {
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(170px, 1fr));
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   gap: 18px;
   align-items: center;
   min-height: 560px;
@@ -158,7 +160,7 @@ h2 {
 
 .network .badge-card {
   grid-column: 3;
-  grid-row: 1;
+  grid-row: 2;
   justify-self: end;
   align-self: start;
   z-index: 2;
@@ -198,13 +200,13 @@ h2 {
 
 .cluster.inputs {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   box-shadow: 0 0 0 1px var(--inputs-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
 .cluster.external-source {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   justify-self: start;
   width: min(48%, 180px);
   box-shadow: 0 0 0 1px var(--external-sources-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
@@ -212,15 +214,23 @@ h2 {
 
 .cluster.external-source-store {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   justify-self: end;
   width: min(48%, 180px);
   box-shadow: 0 0 0 1px var(--external-sources-alt-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
+.cluster.external-source-router {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: end;
+  width: min(80%, 180px);
+  box-shadow: 0 0 0 1px var(--router-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+
 .component-node {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   z-index: 1;
   padding: 26px 22px;
   min-width: 0;
@@ -233,13 +243,13 @@ h2 {
 
 .cluster.outputs {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 3;
   box-shadow: 0 0 0 1px var(--outputs-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
 .cluster.external-source-provide {
   grid-column: 2;
-  grid-row: 3;
+  grid-row: 4;
   box-shadow: 0 0 0 1px var(--external-sources-glow), 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
@@ -360,6 +370,11 @@ h2 {
   color: #f7d97e;
 }
 
+.external-source-router .cluster-total,
+.external-source-router .metric-value {
+  color: #c4b5fd;
+}
+
 .outputs .cluster-total,
 .outputs .metric-value {
   color: #ffc38f;
@@ -461,7 +476,7 @@ h2 {
 @media (max-width: 980px) {
   .network {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(8, auto);
+    grid-template-rows: repeat(9, auto);
     min-height: auto;
     padding-top: 0;
   }
@@ -490,6 +505,7 @@ h2 {
   .cluster.inputs,
   .cluster.external-source,
   .cluster.external-source-store,
+  .cluster.external-source-router,
   .component-node,
   .cluster.outputs,
   .cluster.external-source-provide {
@@ -498,28 +514,32 @@ h2 {
     justify-self: stretch;
   }
 
-  .cluster.external-source {
+  .cluster.external-source-router {
     grid-row: 3;
   }
 
-  .cluster.external-source-store {
+  .cluster.external-source {
     grid-row: 4;
   }
 
-  .component-node {
+  .cluster.external-source-store {
     grid-row: 5;
   }
 
-  .cluster.inputs {
+  .component-node {
     grid-row: 6;
   }
 
-  .cluster.outputs {
+  .cluster.inputs {
     grid-row: 7;
   }
 
-  .cluster.external-source-provide {
+  .cluster.outputs {
     grid-row: 8;
+  }
+
+  .cluster.external-source-provide {
+    grid-row: 9;
   }
 }
 

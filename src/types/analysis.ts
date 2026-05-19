@@ -11,6 +11,7 @@ export interface AnalysisBucket {
   injects: string[];
   provides: string[];
   stores: string[];
+  router: string[];
   apiCalls: string[];
   exposed: string[];
   slotProps: string[];
@@ -29,6 +30,7 @@ export interface AnalysisDetailBucket {
   injects: AnalysisDetailItem[];
   provides: AnalysisDetailItem[];
   stores: AnalysisDetailItem[];
+  router: AnalysisDetailItem[];
   apiCalls: AnalysisDetailItem[];
   exposed: AnalysisDetailItem[];
   slotProps: AnalysisDetailItem[];
@@ -78,7 +80,7 @@ export interface BadgeGroups {
   outputs: boolean;
 }
 
-export type AnalysisMetricName = 'inputs' | 'reactivity' | 'outputs' | 'injects' | 'provides' | 'stores';
+export type AnalysisMetricName = 'inputs' | 'reactivity' | 'outputs' | 'injects' | 'provides' | 'stores' | 'router';
 
 export type BadgeGroupName = keyof BadgeGroups;
 

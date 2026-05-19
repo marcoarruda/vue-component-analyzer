@@ -29,6 +29,7 @@ interface ScriptAnalysis {
   injects: Set<string>;
   provides: Set<string>;
   stores: Set<string>;
+  router: Set<string>;
   apiCalls: Set<string>;
   exposed: Set<string>;
   refs: Set<string>;
@@ -62,6 +63,7 @@ export function analyzeVueSfcComponent(input: AnalyzerInput): ComponentAnalysisR
     injects: sortValues(scriptAnalysis.injects),
     provides: sortValues(scriptAnalysis.provides),
     stores: sortValues(scriptAnalysis.stores),
+    router: sortValues(scriptAnalysis.router),
     apiCalls: sortValues(scriptAnalysis.apiCalls),
     exposed: sortValues(scriptAnalysis.exposed),
     slotProps: sortValues(templateAnalysis.slotProps)
@@ -83,6 +85,7 @@ export function analyzeVueSfcComponent(input: AnalyzerInput): ComponentAnalysisR
       injects: toDetailItems(external.injects),
       provides: toDetailItems(external.provides),
       stores: toDetailItems(external.stores),
+      router: toDetailItems(external.router),
       apiCalls: toDetailItems(external.apiCalls),
       exposed: toDetailItems(external.exposed),
       slotProps: toDetailItems(external.slotProps)
@@ -244,6 +247,11 @@ function collectVariableMetrics(node: t.VariableDeclarator, analysis: ScriptAnal
 
   if (isStoreComposableName(callName)) {
     analysis.stores.add(callName as string);
+    return;
+  }
+
+  if (isRouterComposableName(callName)) {
+    analysis.router.add(callName as string);
   }
 }
 
@@ -293,6 +301,11 @@ function collectCallMetrics(node: t.CallExpression, analysis: ScriptAnalysis, ty
 
   if (isStoreComposableName(callName)) {
     analysis.stores.add(callName as string);
+    return;
+  }
+
+  if (isRouterComposableName(callName)) {
+    analysis.router.add(callName as string);
     return;
   }
 
@@ -904,6 +917,18 @@ function isStoreComposableName(name: string | undefined) {
   return Boolean(name && /^use[A-Z]\w*Store$/.test(name));
 }
 
+const ROUTER_COMPOSABLES = new Set([
+  'useRouter',
+  'useRoute',
+  'useLink',
+  'onBeforeRouteLeave',
+  'onBeforeRouteUpdate'
+]);
+
+function isRouterComposableName(name: string | undefined) {
+  return Boolean(name && ROUTER_COMPOSABLES.has(name));
+}
+
 function scoreAnalysis(external: ComponentAnalysisResult['external'], internal: ComponentAnalysisResult['internal']) {
   const externalScore = Object.values(external).reduce((total, values) => total + values.length, 0);
   const internalScore = Object.values(internal).reduce((total, values) => total + values.length, 0);
@@ -927,6 +952,7 @@ function createEmptyScriptAnalysis(): ScriptAnalysis {
     injects: new Set<string>(),
     provides: new Set<string>(),
     stores: new Set<string>(),
+    router: new Set<string>(),
     apiCalls: new Set<string>(),
     exposed: new Set<string>(),
     refs: new Set<string>(),
