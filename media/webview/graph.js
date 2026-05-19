@@ -330,253 +330,252 @@ function createLayout(nodes, width, height) {
 
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges = graph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
-  const outgoingByNodeId = new Map();
-  const incomingCountByNodeId = new Map(nodes.map((node) => [node.id, 0]));
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
+  // Build adjacency
+  const outgoingByNode = new Map(nodes.map((node) => [node.id, []]));
+  const incomingByNode = new Map(nodes.map((node) => [node.id, []]));
   for (const edge of edges) {
-    const outgoing = outgoingByNodeId.get(edge.source) || [];
-    outgoing.push(edge.target);
-    outgoingByNodeId.set(edge.source, outgoing);
-    incomingCountByNodeId.set(edge.target, (incomingCountByNodeId.get(edge.target) || 0) + 1);
+    outgoingByNode.get(edge.source).push(edge.target);
+    incomingByNode.get(edge.target).push(edge.source);
   }
 
+  // ── STEP 1: Longest-path topological level assignment (Kahn's) ───────────
+  // level[v] = max(level[u] + 1) over all u → v
+  // This guarantees every node sits strictly below all its importers,
+  // so direct imports of app.vue are always above the router.
   const preferredPaths = ['src/App.vue', 'src/main.ts', 'app/app.vue', 'app/App.vue'];
-  const preferredPathRank = new Map(preferredPaths.map((path, index) => [path, index]));
-  const levelByNodeId = new Map();
+  const preferredPathSet = new Set(preferredPaths);
+  const preferredPathRank = new Map(preferredPaths.map((p, i) => [p, i]));
 
-  function compareNodes(left, right) {
-    const preferredRankDelta = (preferredPathRank.get(left.path) ?? Number.MAX_SAFE_INTEGER)
-      - (preferredPathRank.get(right.path) ?? Number.MAX_SAFE_INTEGER);
-    if (preferredRankDelta !== 0) {
-      return preferredRankDelta;
-    }
+  const levelByNode = new Map();
+  // Treat preferred entry-points as roots regardless of incoming edges
+  const workingInDeg = new Map(nodes.map((node) => [
+    node.id,
+    preferredPathSet.has(node.path) ? 0 : incomingByNode.get(node.id).length
+  ]));
 
-    const incomingDelta = (incomingCountByNodeId.get(left.id) || 0) - (incomingCountByNodeId.get(right.id) || 0);
-    if (incomingDelta !== 0) {
-      return incomingDelta;
-    }
-
-    const outgoingDelta = (outgoingByNodeId.get(right.id)?.length || 0) - (outgoingByNodeId.get(left.id)?.length || 0);
-    if (outgoingDelta !== 0) {
-      return outgoingDelta;
-    }
-
-    return left.path.localeCompare(right.path);
-  }
-
-  function assignLevelsFromRoots(rootNodes) {
-    const queue = rootNodes.map((node) => ({ nodeId: node.id, level: 0 }));
-
-    for (let index = 0; index < queue.length; index += 1) {
-      const current = queue[index];
-      const knownLevel = levelByNodeId.get(current.nodeId);
-      if (knownLevel !== undefined && knownLevel <= current.level) {
-        continue;
-      }
-
-      levelByNodeId.set(current.nodeId, current.level);
-
-      const targets = [...(outgoingByNodeId.get(current.nodeId) || [])].sort((left, right) => left.localeCompare(right));
-      for (const targetId of targets) {
-        queue.push({ nodeId: targetId, level: current.level + 1 });
-      }
+  const queue = [];
+  const enqueued = new Set();
+  for (const node of nodes) {
+    if (workingInDeg.get(node.id) === 0) {
+      levelByNode.set(node.id, 0);
+      queue.push(node.id);
+      enqueued.add(node.id);
     }
   }
+  // Preferred paths first so their levels propagate before other roots
+  queue.sort((a, b) => {
+    const rankA = preferredPathRank.get(nodesById.get(a)?.path ?? '') ?? Number.MAX_SAFE_INTEGER;
+    const rankB = preferredPathRank.get(nodesById.get(b)?.path ?? '') ?? Number.MAX_SAFE_INTEGER;
+    return rankA - rankB;
+  });
 
-  const preferredRoots = nodes
-    .filter((node) => preferredPathRank.has(node.path))
-    .sort(compareNodes);
-  assignLevelsFromRoots(preferredRoots);
+  let qi = 0;
+  while (qi < queue.length) {
+    const nodeId = queue[qi++];
+    const currentLevel = levelByNode.get(nodeId) ?? 0;
+    for (const targetId of outgoingByNode.get(nodeId) ?? []) {
+      // Propagate longest path — keep the maximum depth seen so far
+      const proposed = currentLevel + 1;
+      if (!levelByNode.has(targetId) || levelByNode.get(targetId) < proposed) {
+        levelByNode.set(targetId, proposed);
+      }
+      const newDeg = (workingInDeg.get(targetId) ?? 1) - 1;
+      workingInDeg.set(targetId, newDeg);
+      // Only enqueue once all predecessors are processed (ensures max level is known)
+      if (newDeg <= 0 && !enqueued.has(targetId)) {
+        enqueued.add(targetId);
+        queue.push(targetId);
+      }
+    }
+  }
+  // Cycle nodes (never dequeued) are placed below everything else
+  const maxAssignedLevel = levelByNode.size > 0 ? Math.max(...levelByNode.values()) : 0;
+  for (const node of nodes) {
+    if (!levelByNode.has(node.id)) {
+      levelByNode.set(node.id, maxAssignedLevel + 1);
+    }
+  }
 
-  const fallbackRoots = nodes
-    .filter((node) => !levelByNodeId.has(node.id) && (incomingCountByNodeId.get(node.id) || 0) === 0)
-    .sort(compareNodes);
-  assignLevelsFromRoots(fallbackRoots);
-
-  const remainingNodes = nodes
-    .filter((node) => !levelByNodeId.has(node.id))
-    .sort(compareNodes);
-  assignLevelsFromRoots(remainingNodes);
-
+  // ── STEP 2: Zone classification ──────────────────────────────────────────
+  // Services → left lane, Stores → right lane, everything else → center lane.
+  // Side zones are only allocated when those node types are actually visible.
   function pathAfterSrc(node) {
-    if (node.path.startsWith('src/')) {
-      return node.path.slice(4);
-    }
-    if (node.path.startsWith('app/')) {
-      return node.path.slice(4);
-    }
+    if (node.path.startsWith('src/')) return node.path.slice(4);
+    if (node.path.startsWith('app/')) return node.path.slice(4);
     return node.path;
   }
 
-  function classifyNode(node) {
-    if (preferredPathRank.has(node.path)) {
-      return 'root';
-    }
-
-    if (node.id === '__nuxt-router__') {
-      return 'router';
-    }
-
-    const normalizedPath = pathAfterSrc(node);
-    if (normalizedPath.startsWith('router/')) {
-      return 'router';
-    }
-    if (normalizedPath.startsWith('stores/')) {
-      return 'store';
-    }
-    if (normalizedPath.startsWith('services/')) {
-      return 'service';
-    }
-
-    return 'other';
+  function getZone(node) {
+    if (preferredPathSet.has(node.path)) return 'center';
+    const p = pathAfterSrc(node);
+    if (p.startsWith('stores/') || p.startsWith('store/')) return 'right';
+    if (p.startsWith('services/')) return 'left';
+    return 'center';
   }
 
-  function isGroupIndexNode(node, group) {
-    const normalizedPath = pathAfterSrc(node);
-    return normalizedPath.startsWith(group + '/') && normalizedPath.endsWith('/index.ts');
+  // ── STEP 3: Build rows grouped by level, sorted by connectivity ──────────
+  const connectionCount = new Map(nodes.map((node) => [
+    node.id,
+    (outgoingByNode.get(node.id)?.length ?? 0) + (incomingByNode.get(node.id)?.length ?? 0)
+  ]));
+
+  function compareByConnectivity(a, b) {
+    const connDelta = (connectionCount.get(b.id) ?? 0) - (connectionCount.get(a.id) ?? 0);
+    if (connDelta !== 0) return connDelta;
+    const rankA = preferredPathRank.get(a.path) ?? Number.MAX_SAFE_INTEGER;
+    const rankB = preferredPathRank.get(b.path) ?? Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.path.localeCompare(b.path);
   }
 
-  const positions = new Map();
+  const rowsByLevel = new Map();
+  for (const node of nodes) {
+    const lv = levelByNode.get(node.id) ?? 0;
+    if (!rowsByLevel.has(lv)) {
+      rowsByLevel.set(lv, { left: [], center: [], right: [] });
+    }
+    rowsByLevel.get(lv)[getZone(node)].push(node);
+  }
+  for (const row of rowsByLevel.values()) {
+    row.left.sort(compareByConnectivity);
+    row.center.sort(compareByConnectivity);
+    row.right.sort(compareByConnectivity);
+  }
+
+  const sortedLevels = Array.from(rowsByLevel.keys()).sort((a, b) => a - b);
+  const rowCount = sortedLevels.length;
+
+  // ── STEP 4: Compute zone geometry ────────────────────────────────────────
   const topPadding = 90;
   const bottomPadding = 90;
   const leftPadding = 90;
   const rightPadding = 90;
-  const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
   const availableWidth = Math.max(width - leftPadding - rightPadding, 1);
-  const routerNodes = nodes.filter((node) => classifyNode(node) === 'router').sort(compareNodes);
-  const serviceNodes = nodes.filter((node) => classifyNode(node) === 'service').sort(compareNodes);
-  const storeNodes = nodes.filter((node) => classifyNode(node) === 'store').sort(compareNodes);
-  const groupedNodes = {
-    root: nodes.filter((node) => classifyNode(node) === 'root').sort(compareNodes),
-    routerIndex: routerNodes.filter((node) => isGroupIndexNode(node, 'router')),
-    router: routerNodes.filter((node) => !isGroupIndexNode(node, 'router')),
-    serviceIndex: serviceNodes.filter((node) => isGroupIndexNode(node, 'services')),
-    service: serviceNodes.filter((node) => !isGroupIndexNode(node, 'services')),
-    storeIndex: storeNodes.filter((node) => isGroupIndexNode(node, 'stores')),
-    store: storeNodes.filter((node) => !isGroupIndexNode(node, 'stores')),
-    other: nodes.filter((node) => classifyNode(node) === 'other').sort((left, right) => {
-      const levelDelta = (levelByNodeId.get(left.id) || 0) - (levelByNodeId.get(right.id) || 0);
-      if (levelDelta !== 0) {
-        return levelDelta;
-      }
-      return compareNodes(left, right);
-    })
-  };
-
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const routerNodeIds = new Set(groupedNodes.router.map((node) => node.id));
-  const routerConnectedViewIds = new Set();
-  for (const edge of edges) {
-    const sourceIsRouter = routerNodeIds.has(edge.source);
-    const targetIsRouter = routerNodeIds.has(edge.target);
-    if (!sourceIsRouter && !targetIsRouter) {
-      continue;
-    }
-
-    const candidateId = sourceIsRouter ? edge.target : edge.source;
-    const candidateNode = nodesById.get(candidateId);
-    if (candidateNode) {
-      const candidatePath = pathAfterSrc(candidateNode);
-      if (candidatePath.startsWith('views/') || candidatePath.startsWith('pages/')) {
-        routerConnectedViewIds.add(candidateNode.id);
-      }
-    }
-  }
-
-  const routerConnectedViews = groupedNodes.other.filter((node) => routerConnectedViewIds.has(node.id));
-  groupedNodes.other = groupedNodes.other.filter((node) => !routerConnectedViewIds.has(node.id));
-
-  const otherLevels = groupedNodes.other.map((node) => levelByNodeId.get(node.id) || 0);
-
-  const maxOtherLevel = otherLevels.length > 0 ? Math.max(...otherLevels) : 0;
-  const hasRouterIndexNodes = groupedNodes.routerIndex.length > 0;
-  const hasRouterNodes = groupedNodes.router.length > 0;
-  const hasRouterConnectedViews = routerConnectedViews.length > 0;
-  const hasServiceStoreIndexNodes = groupedNodes.serviceIndex.length > 0 || groupedNodes.storeIndex.length > 0;
-  let nextRowIndex = 1;
-  const routerIndexRowIndex = hasRouterIndexNodes ? nextRowIndex++ : null;
-  const routerRowIndex = hasRouterNodes ? nextRowIndex++ : null;
-  const routerConnectedViewsRowIndex = hasRouterConnectedViews ? nextRowIndex++ : null;
-  const serviceStoreIndexRowIndex = hasServiceStoreIndexNodes ? nextRowIndex++ : null;
-  const serviceStoreRowIndex = nextRowIndex++;
-  const otherRowBaseIndex = nextRowIndex;
-  const otherRowCount = Math.max(1, maxOtherLevel + 1);
-  const rowCount = otherRowBaseIndex + otherRowCount;
+  const availableHeight = Math.max(height - topPadding - bottomPadding, 1);
   const rowGap = rowCount > 1 ? (availableHeight * VERTICAL_LAYOUT_MULTIPLIER) / (rowCount - 1) : 0;
 
-  function placeNodesHorizontally(bucketNodes, rowIndex, startX, laneWidth) {
-    if (bucketNodes.length === 0) {
-      return;
-    }
+  const hasAnyLeft = nodes.some((n) => getZone(n) === 'left');
+  const hasAnyRight = nodes.some((n) => getZone(n) === 'right');
+  const sideZoneFrac = 0.25;
+  const usedSideFrac = (hasAnyLeft ? sideZoneFrac : 0) + (hasAnyRight ? sideZoneFrac : 0);
+  const centerZoneFrac = 1 - usedSideFrac;
+  const sideZoneWidth = availableWidth * sideZoneFrac;
+  const centerZoneWidth = availableWidth * centerZoneFrac;
+  const centerZoneStart = leftPadding + (hasAnyLeft ? sideZoneWidth : 0);
+  const rightZoneStart = leftPadding + (hasAnyLeft ? sideZoneWidth : 0) + centerZoneWidth;
 
-    const y = topPadding + rowGap * rowIndex;
+  // ── STEP 5: Place nodes top-down with barycenter-guided positioning ─────────
+  // Each node's ideal X = average X of its already-placed parents (barycenter).
+  // Nodes within a row are sorted by that ideal, then a forward+backward scan
+  // resolves overlaps while keeping each node as close to its ideal as possible.
+  // The group is finally centred around the mean of the ideals (or the lane
+  // centre for root rows that have no placed parents yet).
+  const positions = new Map();
+
+  function placeRow(rowNodes, y, startX, laneWidth) {
+    if (rowNodes.length === 0) return;
     const laneCenter = startX + Math.max(laneWidth, 1) / 2;
 
-    if (bucketNodes.length === 1) {
-      positions.set(bucketNodes[0].id, {
-        x: laneCenter,
-        y,
-        depth: rowIndex
-      });
+    // Compute ideal X = average X of already-placed parents
+    const idealByNode = new Map();
+    for (const node of rowNodes) {
+      const parents = incomingByNode.get(node.id) ?? [];
+      const placed = parents.map((id) => positions.get(id)).filter(Boolean);
+      if (placed.length > 0) {
+        idealByNode.set(node.id, placed.reduce((s, p) => s + p.x, 0) / placed.length);
+      }
+    }
+    const hasIdeal = idealByNode.size > 0;
+
+    // Sort: nodes with placed parents by their ideal X; orphans by connectivity
+    const sorted = [...rowNodes].sort((a, b) => {
+      const ia = idealByNode.get(a.id);
+      const ib = idealByNode.get(b.id);
+      if (ia !== undefined && ib !== undefined) return ia - ib;
+      if (ia !== undefined) return -1;
+      if (ib !== undefined) return 1;
+      return compareByConnectivity(a, b);
+    });
+
+    const radii = sorted.map((node) => radiusForNode(node));
+
+    if (sorted.length === 1) {
+      const idealX = idealByNode.get(sorted[0].id) ?? laneCenter;
+      const minX = leftPadding + radii[0];
+      const maxX = width - rightPadding - radii[0];
+      positions.set(sorted[0].id, { x: Math.min(Math.max(idealX, minX), maxX), y, depth: 0 });
       return;
     }
 
-    const diameters = bucketNodes.map((node) => radiusForNode(node) * 2);
-    const minimumGaps = bucketNodes.slice(0, -1).map((node, index) => {
-      return Math.max(diameters[index], diameters[index + 1]) * 2;
+    // Minimum separation between adjacent centres (×2.2 avoids visual overlap)
+    const minSep = radii.slice(0, -1).map((_, i) => (radii[i] + radii[i + 1]) * 2.2);
+
+    // Build ideal X array; fill nulls by neighbour interpolation
+    const idealArr = sorted.map((node) => idealByNode.get(node.id) ?? null);
+    const filled = idealArr.map((x, i) => {
+      if (x !== null) return x;
+      for (let d = 1; d < sorted.length; d++) {
+        const prev = i - d >= 0 ? idealArr[i - d] : null;
+        const next = i + d < sorted.length ? idealArr[i + d] : null;
+        if (prev !== null && next !== null) return (prev + next) / 2;
+        if (prev !== null) return prev + d * 55;
+        if (next !== null) return next - d * 55;
+      }
+      return laneCenter;
     });
-    const minimumSpan = minimumGaps.reduce((sum, gap) => sum + gap, 0);
-    const targetSpan = Math.max(Math.max(laneWidth, 1), minimumSpan);
-    const extraGap = (targetSpan - minimumSpan) / minimumGaps.length;
-    const firstRadius = diameters[0] / 2;
-    const lastRadius = diameters[diameters.length - 1] / 2;
-    const minCenterX = leftPadding + firstRadius;
-    const maxCenterX = width - rightPadding - lastRadius;
-    const unclampedStartX = laneCenter - targetSpan / 2;
-    const maxStartX = Math.max(minCenterX, maxCenterX - targetSpan);
-    const rowStartX = Math.min(Math.max(unclampedStartX, minCenterX), maxStartX);
 
-    let x = rowStartX;
-    bucketNodes.forEach((node, nodeIndex) => {
-      positions.set(node.id, {
-        x,
-        y,
-        depth: rowIndex
-      });
+    // Forward scan: push right to enforce minimum separation
+    const assignedX = [...filled];
+    for (let i = 1; i < sorted.length; i++) {
+      assignedX[i] = Math.max(assignedX[i], assignedX[i - 1] + minSep[i - 1]);
+    }
+    // Backward scan: push left to enforce minimum separation
+    for (let i = sorted.length - 2; i >= 0; i--) {
+      assignedX[i] = Math.min(assignedX[i], assignedX[i + 1] - minSep[i]);
+    }
 
-      x += (minimumGaps[nodeIndex] || 0) + extraGap;
-    });
-  }
+    // Centre the group around the mean of ideal positions (or lane centre for roots)
+    {
+      let targetCenter;
+      if (hasIdeal) {
+        let sum = 0, count = 0;
+        for (const node of sorted) {
+          const ideal = idealByNode.get(node.id);
+          if (ideal !== undefined) { sum += ideal; count++; }
+        }
+        targetCenter = sum / count;
+      } else {
+        targetCenter = laneCenter;
+      }
+      const groupMid = (assignedX[0] + assignedX[sorted.length - 1]) / 2;
+      const centerShift = targetCenter - groupMid;
+      for (let i = 0; i < sorted.length; i++) assignedX[i] += centerShift;
+    }
 
-  placeNodesHorizontally(groupedNodes.root, 0, width * 0.3, width * 0.4);
-  if (routerIndexRowIndex !== null) {
-    placeNodesHorizontally(groupedNodes.routerIndex, routerIndexRowIndex, width * 0.28, width * 0.44);
-  }
-  if (routerRowIndex !== null) {
-    placeNodesHorizontally(groupedNodes.router, routerRowIndex, width * 0.28, width * 0.44);
-  }
-  if (routerConnectedViewsRowIndex !== null) {
-    placeNodesHorizontally(routerConnectedViews, routerConnectedViewsRowIndex, leftPadding, availableWidth);
-  }
-  if (serviceStoreIndexRowIndex !== null) {
-    placeNodesHorizontally(groupedNodes.serviceIndex, serviceStoreIndexRowIndex, leftPadding, availableWidth * 0.34);
-    placeNodesHorizontally(groupedNodes.storeIndex, serviceStoreIndexRowIndex, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
-  }
-  placeNodesHorizontally(groupedNodes.service, serviceStoreRowIndex, leftPadding, availableWidth * 0.34);
-  placeNodesHorizontally(groupedNodes.store, serviceStoreRowIndex, width - rightPadding - availableWidth * 0.34, availableWidth * 0.34);
+    // Clamp to canvas bounds
+    const firstMinX = leftPadding + radii[0];
+    const lastMaxX = width - rightPadding - radii[sorted.length - 1];
+    let shift = 0;
+    if (assignedX[0] < firstMinX) shift = firstMinX - assignedX[0];
+    if (assignedX[sorted.length - 1] + shift > lastMaxX) {
+      shift = lastMaxX - assignedX[sorted.length - 1];
+    }
+    shift = Math.max(shift, firstMinX - assignedX[0]);
 
-  const otherRows = new Map();
-  for (const node of groupedNodes.other) {
-    const inferredLevel = levelByNodeId.get(node.id) || 0;
-    const rowIndex = otherRowBaseIndex + Math.max(0, inferredLevel);
-    const bucket = otherRows.get(rowIndex) || [];
-    bucket.push(node);
-    otherRows.set(rowIndex, bucket);
+    for (let i = 0; i < sorted.length; i++) {
+      positions.set(sorted[i].id, { x: assignedX[i] + shift, y, depth: 0 });
+    }
   }
 
-  for (const [rowIndex, rowNodes] of Array.from(otherRows.entries()).sort((left, right) => left[0] - right[0])) {
-    placeNodesHorizontally(rowNodes, rowIndex, leftPadding, availableWidth);
-  }
+  sortedLevels.forEach((level, rowIndex) => {
+    const row = rowsByLevel.get(level);
+    const y = topPadding + rowGap * rowIndex;
+    placeRow(row.center, y, centerZoneStart, centerZoneWidth);
+    if (hasAnyLeft) placeRow(row.left, y, leftPadding, sideZoneWidth);
+    if (hasAnyRight) placeRow(row.right, y, rightZoneStart, sideZoneWidth);
+  });
 
   return positions;
 }
