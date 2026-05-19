@@ -77,7 +77,7 @@ const MIN_SCALE = 0.35;
 const MAX_SCALE = 4;
 const DRAG_THRESHOLD = 4;
 const VERTICAL_LAYOUT_MULTIPLIER = 1;
-const HORIZONTAL_NODE_GAP_MULTIPLIER = 4.4;
+const HORIZONTAL_NODE_GAP_MULTIPLIER = 6.4;
 
 if (graphCanvas) {
   graphCanvas.addEventListener('pointerdown', handlePointerDown);
