@@ -90,7 +90,9 @@ export function createLayout(
     const currentLevel = levelByNode.get(nodeId) ?? 0;
     for (const targetId of outgoingByNode.get(nodeId) ?? []) {
       const proposed = currentLevel + 1;
-      if (!levelByNode.has(targetId) || levelByNode.get(targetId)! < proposed) {
+      // Use minimum level: first parent to process a node (always the shallowest in BFS
+      // order) sets the level. Keeps nodes as high as possible, avoiding vertical stretch.
+      if (!levelByNode.has(targetId)) {
         levelByNode.set(targetId, proposed);
       }
       const newDeg = (workingInDeg.get(targetId) ?? 1) - 1;
@@ -148,8 +150,7 @@ export function createLayout(
   }
   for (const node of nodes) countDescendants(node.id);
 
-  // Sort each node's children: heavier subtrees first, then alphabetically.
-  // This puts larger branches on the left and smaller on the right for visual balance.
+  // Initial sort: heavy subtrees first, then alphabetically (used for preliminary layout).
   for (const [, children] of spanningChildren) {
     children.sort((a, b) => {
       const da = descendantCount.get(a) ?? 0;
@@ -193,7 +194,6 @@ export function createLayout(
       return (connectionCount.get(b.id) ?? 0) - (connectionCount.get(a.id) ?? 0);
     });
 
-  // --- Assign positions top-down ---
   // Each node is centered in its slot; children fill consecutive sub-slots below.
   const topPadding = 90;
   const positions = new Map<string, NodePosition>();
@@ -213,11 +213,42 @@ export function createLayout(
     }
   }
 
-  // Center the entire root row in the canvas; add ROOT_EXTRA_GAP between separate root subtrees
   const totalRootsWidth = roots.reduce((s, r) => s + slotWidths.get(r.id)!, 0)
     + ROOT_EXTRA_GAP * Math.max(roots.length - 1, 0);
-  let rootSlotX = Math.max((width - totalRootsWidth) / 2, 20);
+  const initialRootSlotX = Math.max((width - totalRootsWidth) / 2, 20);
 
+  // --- Pass 1: preliminary positions so we can compute each node's idealX ---
+  let rootSlotX = initialRootSlotX;
+  for (const root of roots) {
+    assignPositions(root.id, rootSlotX, 0);
+    rootSlotX += slotWidths.get(root.id)! + ROOT_EXTRA_GAP;
+  }
+
+  // --- Re-sort children: heavy subtrees first, then by idealX (mean x of all parents),
+  //     then alphabetically. Nodes with parents spread across the graph are placed at the
+  //     horizontal position closest to all of them, minimising long cross-tree edges. ---
+  for (const [, children] of spanningChildren) {
+    if (children.length <= 1) continue;
+    children.sort((a, b) => {
+      const da = descendantCount.get(a) ?? 0;
+      const db = descendantCount.get(b) ?? 0;
+      if (da !== db) return db - da;
+      const parentsA = incomingByNode.get(a) ?? [];
+      const parentsB = incomingByNode.get(b) ?? [];
+      const idealXA = parentsA.length > 0
+        ? parentsA.reduce((s, p) => s + (positions.get(p)?.x ?? 0), 0) / parentsA.length
+        : (positions.get(a)?.x ?? 0);
+      const idealXB = parentsB.length > 0
+        ? parentsB.reduce((s, p) => s + (positions.get(p)?.x ?? 0), 0) / parentsB.length
+        : (positions.get(b)?.x ?? 0);
+      if (idealXA !== idealXB) return idealXA - idealXB;
+      return (nodesById.get(a)?.path ?? '').localeCompare(nodesById.get(b)?.path ?? '');
+    });
+  }
+
+  // --- Pass 2: final positions using proximity-optimised child order ---
+  positions.clear();
+  rootSlotX = initialRootSlotX;
   for (const root of roots) {
     assignPositions(root.id, rootSlotX, 0);
     rootSlotX += slotWidths.get(root.id)! + ROOT_EXTRA_GAP;

@@ -26,15 +26,6 @@
       </div>
     </section>
 
-    <ControlsPanel
-      v-if="isPanel"
-      :filters="filters"
-      :folder-names="folderNames"
-      @update-filter="updateFilter"
-      @toggle-folder="toggleFolder"
-      @set-all-folders="setAllFolders"
-    />
-
     <GraphCanvas
       v-if="isPanel"
       :visible-nodes="visibleNodes"
@@ -48,12 +39,22 @@
       @open-file="openFile"
     />
 
+    <LegendPanel v-if="isPanel" />
+
+    <ControlsPanel
+      v-if="isPanel"
+      :filters="filters"
+      :folder-names="folderNames"
+      @update-filter="updateFilter"
+      @toggle-folder="toggleFolder"
+      @set-all-folders="setAllFolders"
+    />
+
+    <StatsPanel v-if="isPanel" :stats="graph.stats" />
+
     <section v-if="isSidebar" class="panel graph-launch-panel">
       <button class="graph-launch-button" type="button" @click="openGraphPanel">Open Full Project Graph</button>
     </section>
-
-    <LegendPanel v-if="isPanel" />
-    <StatsPanel v-if="isPanel" :stats="graph.stats" />
   </div>
 </template>
 
