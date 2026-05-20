@@ -1,10 +1,22 @@
-import * as fs from 'node:fs';
-
 import * as vscode from 'vscode';
 
 import type { ProjectGraphResult } from '../types/projectGraph';
 
-let projectGraphTemplateCache: string | undefined;
+const PROJECT_GRAPH_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP_SOURCE}}; script-src 'nonce-{{SCRIPT_NONCE}}' {{CSP_SOURCE}};" />
+    <link rel="stylesheet" href="{{STYLES_URI}}" />
+    <title>Vue Analyzer Project Graph</title>
+  </head>
+  <body class="{{BODY_CLASS}}">
+    <div id="app"></div>
+    <script id="graph-payload" type="application/json">{{GRAPH_PAYLOAD}}</script>
+    <script type="module" nonce="{{SCRIPT_NONCE}}" src="{{SCRIPT_URI}}"></script>
+  </body>
+</html>`;
 
 export function renderProjectGraphWebview(
   webview: vscode.Webview,
@@ -12,7 +24,7 @@ export function renderProjectGraphWebview(
   graph: ProjectGraphResult,
   layout: 'panel' | 'sidebar' = 'panel'
 ) {
-  const template = getProjectGraphTemplate(extensionUri);
+  const template = getProjectGraphTemplate();
   const scriptNonce = createNonce();
   const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'graph.css'));
   const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'graph.js'));
@@ -26,11 +38,8 @@ export function renderProjectGraphWebview(
     .replaceAll('{{GRAPH_PAYLOAD}}', serializeForScript(graph));
 }
 
-function getProjectGraphTemplate(extensionUri: vscode.Uri) {
-  if (projectGraphTemplateCache) return projectGraphTemplateCache;
-  const templatePath = vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'graph.html');
-  projectGraphTemplateCache = fs.readFileSync(templatePath.fsPath, 'utf8');
-  return projectGraphTemplateCache;
+function getProjectGraphTemplate() {
+  return PROJECT_GRAPH_TEMPLATE;
 }
 
 function createNonce() {

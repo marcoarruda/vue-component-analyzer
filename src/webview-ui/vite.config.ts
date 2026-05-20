@@ -9,7 +9,7 @@ export default defineConfig({
   root,
   build: {
     outDir: resolve(__dirname, '../../media/webview'),
-    emptyOutDir: false,
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         complexity: resolve(root, 'complexity/main.ts'),

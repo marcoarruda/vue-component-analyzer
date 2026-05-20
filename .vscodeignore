@@ -1,0 +1,10 @@
+src/
+samples/
+.github/
+.claude/
+.vscode/
+tsconfig.json
+CLAUDE.md
+package-lock.json
+.gitignore
+.vscodeignore

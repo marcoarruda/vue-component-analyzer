@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-
 import * as vscode from 'vscode';
 
 import type { ComponentAnalysisResult, AnalysisDetailItem } from '../types/analysis';
@@ -10,14 +8,14 @@ export function renderComplexityWebview(
   extensionUri: vscode.Uri,
   analysis: ComponentAnalysisResult
 ) {
-  const template = getComplexityTemplate(extensionUri);
+  const template = getComplexityTemplate();
   const scriptNonce = createNonce();
   const badgeGroups = getBadgeGroups(analysis);
   const badgeLabel = getBadgeCombinationLabel(badgeGroups);
   const badgeAssetUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'file-badges', getBadgeAssetName(badgeGroups))
   );
-  const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'style.css'));
+  const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'complexity.css'));
   const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'complexity.js'));
   const payload = createPayload(analysis, String(badgeAssetUri), badgeLabel);
 
@@ -71,13 +69,24 @@ function createPayload(
   };
 }
 
-let complexityTemplateCache: string | undefined;
+const COMPLEXITY_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{CSP_SOURCE}}; style-src {{CSP_SOURCE}}; script-src 'nonce-{{SCRIPT_NONCE}}' {{CSP_SOURCE}};" />
+    <link rel="stylesheet" href="{{STYLES_URI}}" />
+    <title>Vue Component Complexity</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script id="analysis-details" type="application/json">{{ANALYSIS_DETAILS}}</script>
+    <script type="module" nonce="{{SCRIPT_NONCE}}" src="{{SCRIPT_URI}}"></script>
+  </body>
+</html>`;
 
-function getComplexityTemplate(extensionUri: vscode.Uri) {
-  if (complexityTemplateCache) return complexityTemplateCache;
-  const templatePath = vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'index.html');
-  complexityTemplateCache = fs.readFileSync(templatePath.fsPath, 'utf8');
-  return complexityTemplateCache;
+function getComplexityTemplate() {
+  return COMPLEXITY_TEMPLATE;
 }
 
 function createNonce() {
