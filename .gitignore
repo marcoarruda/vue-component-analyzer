@@ -1,4 +1,5 @@
 dist/
+media/webview/
 node_modules/
 .DS_Store
 *.vsix
