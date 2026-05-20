@@ -1,5 +1,6 @@
 <template>
   <section class="panel controls-panel">
+    <!-- Graph section -->
     <div class="controls-section">
       <div class="controls-section__header">
         <div class="controls-section__title">Graph</div>
@@ -31,6 +32,7 @@
       </label>
     </div>
 
+    <!-- Architecture section -->
     <div class="controls-section">
       <div class="controls-section__header">
         <div class="controls-section__title">Architecture</div>
@@ -66,6 +68,7 @@
       </label>
     </div>
 
+    <!-- Folder toggles -->
     <ComponentFolderToggles
       :folder-names="folderNames"
       :folder-state="filters.componentFolders"

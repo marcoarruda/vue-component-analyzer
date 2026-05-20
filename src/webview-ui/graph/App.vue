@@ -1,6 +1,6 @@
 <template>
   <div class="shell">
-    <section class="hero panel">
+    <section v-if="isSidebar" class="hero panel">
       <div>
         <div class="eyebrow">Workspace Graph</div>
         <h1>{{ graph.workspaceName }}</h1>
@@ -27,6 +27,7 @@
     </section>
 
     <ControlsPanel
+      v-if="isPanel"
       :filters="filters"
       :folder-names="folderNames"
       @update-filter="updateFilter"
@@ -35,6 +36,7 @@
     />
 
     <GraphCanvas
+      v-if="isPanel"
       :visible-nodes="visibleNodes"
       :visible-edges="visibleEdges"
       :connected-edges-by-node-id="connectedEdgesByNodeId"
@@ -46,12 +48,12 @@
       @open-file="openFile"
     />
 
-    <section class="panel graph-launch-panel">
+    <section v-if="isSidebar" class="panel graph-launch-panel">
       <button class="graph-launch-button" type="button" @click="openGraphPanel">Open Full Project Graph</button>
     </section>
 
-    <LegendPanel />
-    <StatsPanel :stats="graph.stats" />
+    <LegendPanel v-if="isPanel" />
+    <StatsPanel v-if="isPanel" :stats="graph.stats" />
   </div>
 </template>
 
@@ -158,7 +160,15 @@ function openGraphPanel() {
   vscode?.postMessage({ type: 'openGraphPanel' });
 }
 
+// panel or sidebar
+const isSidebar = ref(true)
+const isPanel = computed(() => !isSidebar.value);
+
 onMounted(() => {
+  // get body class name to determine if we're in sidebar or panel context
+  isSidebar.value = document.body.classList.contains('graph-layout--sidebar');
+
+  // Get the graph data from the hidden element and parse it
   const el = document.getElementById('graph-payload');
   if (!el) return;
   try {

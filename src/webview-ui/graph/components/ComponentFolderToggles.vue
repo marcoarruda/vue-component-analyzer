@@ -1,5 +1,5 @@
 <template>
-  <div v-if="folderNames.length > 0" id="component-folder-section" class="controls-section">
+  <div v-if="folderNames.length > 0" class="controls-section">
     <div class="controls-section__header">
       <div class="controls-section__title">Component Folders</div>
       <div class="controls-section__toggles">
