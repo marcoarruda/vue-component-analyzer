@@ -23,24 +23,11 @@ export function renderProjectGraphWebview(
     .replaceAll('{{STYLES_URI}}', String(stylesUri))
     .replaceAll('{{SCRIPT_URI}}', String(scriptUri))
     .replaceAll('{{BODY_CLASS}}', layout === 'sidebar' ? 'graph-layout--sidebar' : '')
-    .replaceAll('{{WORKSPACE_NAME}}', escapeHtml(graph.workspaceName))
-    .replaceAll('{{FILE_COUNT}}', String(graph.stats.fileCount))
-    .replaceAll('{{VUE_FILE_COUNT}}', String(graph.stats.vueFileCount))
-    .replaceAll('{{TS_FILE_COUNT}}', String(graph.stats.tsFileCount))
-    .replaceAll('{{STORE_FILE_COUNT}}', String(graph.stats.storeFileCount))
-    .replaceAll('{{SERVICE_FILE_COUNT}}', String(graph.stats.serviceFileCount))
-    .replaceAll('{{VIEW_FILE_COUNT}}', String(graph.stats.viewFileCount))
-    .replaceAll('{{COMPONENT_FILE_COUNT}}', String(graph.stats.componentFileCount))
-    .replaceAll('{{ROUTER_FILE_COUNT}}', String(graph.stats.routerFileCount))
-    .replaceAll('{{EDGE_COUNT}}', String(graph.stats.edgeCount))
     .replaceAll('{{GRAPH_PAYLOAD}}', serializeForScript(graph));
 }
 
 function getProjectGraphTemplate(extensionUri: vscode.Uri) {
-  if (projectGraphTemplateCache) {
-    return projectGraphTemplateCache;
-  }
-
+  if (projectGraphTemplateCache) return projectGraphTemplateCache;
   const templatePath = vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'graph.html');
   projectGraphTemplateCache = fs.readFileSync(templatePath.fsPath, 'utf8');
   return projectGraphTemplateCache;
@@ -49,11 +36,9 @@ function getProjectGraphTemplate(extensionUri: vscode.Uri) {
 function createNonce() {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let value = '';
-
   for (let index = 0; index < 32; index += 1) {
     value += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
   }
-
   return value;
 }
 
@@ -62,15 +47,6 @@ function serializeForScript(value: unknown) {
     .replaceAll('&', '\\u0026')
     .replaceAll('<', '\\u003C')
     .replaceAll('>', '\\u003E')
-    .replaceAll('\u2028', '\\u2028')
-    .replaceAll('\u2029', '\\u2029');
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+    .replaceAll(String.fromCodePoint(0x2028), '\\u2028')
+    .replaceAll(String.fromCodePoint(0x2029), '\\u2029');
 }

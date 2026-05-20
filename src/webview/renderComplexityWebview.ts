@@ -2,13 +2,8 @@ import * as fs from 'node:fs';
 
 import * as vscode from 'vscode';
 
-import {
-  getBadgeAssetName,
-  getBadgeCombinationLabel,
-  getBadgeGroups,
-  type AnalysisDetailItem,
-  type ComponentAnalysisResult
-} from '../types/analysis';
+import type { ComponentAnalysisResult, AnalysisDetailItem } from '../types/analysis';
+import { getBadgeAssetName, getBadgeCombinationLabel, getBadgeGroups } from '../types/analysis';
 
 export function renderComplexityWebview(
   webview: vscode.Webview,
@@ -17,67 +12,21 @@ export function renderComplexityWebview(
 ) {
   const template = getComplexityTemplate(extensionUri);
   const scriptNonce = createNonce();
-  const inputTotal = analysis.external.props.length + analysis.external.models.length + analysis.external.slots.length;
-  const injectTotal = analysis.external.injects.length;
-  const storeTotal = analysis.external.stores.length;
-  const routerTotal = analysis.external.router.length;
-  const provideTotal = analysis.external.provides.length;
-  const outputTotal = analysis.external.emits.length + analysis.external.exposed.length + analysis.external.slotProps.length;
-  const internalTotal = analysis.internal.refs.length + analysis.internal.computed.length + analysis.internal.watchers.length;
   const badgeGroups = getBadgeGroups(analysis);
   const badgeLabel = getBadgeCombinationLabel(badgeGroups);
   const badgeAssetUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'file-badges', getBadgeAssetName(badgeGroups))
   );
   const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'style.css'));
-  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'main.js'));
-  const detailPayload = createDetailPayload(analysis);
+  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'complexity.js'));
+  const payload = createPayload(analysis, String(badgeAssetUri), badgeLabel);
 
   return template
     .replaceAll('{{CSP_SOURCE}}', webview.cspSource)
     .replaceAll('{{SCRIPT_NONCE}}', scriptNonce)
     .replaceAll('{{STYLES_URI}}', String(stylesUri))
     .replaceAll('{{SCRIPT_URI}}', String(scriptUri))
-    .replaceAll('{{COMPONENT_PATH}}', escapeHtml(analysis.component.path))
-    .replaceAll('{{BADGE_ASSET_URI}}', String(badgeAssetUri))
-    .replaceAll('{{BADGE_LABEL}}', escapeHtml(badgeLabel))
-    .replaceAll('{{INJECT_TOTAL}}', String(injectTotal))
-    .replaceAll('{{INJECT_METRICS}}', renderMetric('Injected', 'injects', detailPayload.injects.items))
-    .replaceAll('{{STORE_TOTAL}}', String(storeTotal))
-    .replaceAll('{{STORE_METRICS}}', renderMetric('Stores', 'stores', detailPayload.stores.items))
-    .replaceAll('{{ROUTER_TOTAL}}', String(routerTotal))
-    .replaceAll('{{ROUTER_METRICS}}', renderMetric('Router', 'router', detailPayload.router.items))
-    .replaceAll('{{INPUT_TOTAL}}', String(inputTotal))
-    .replaceAll(
-      '{{INPUT_METRICS}}',
-      [
-        renderMetric('Props', 'props', detailPayload.props.items),
-        renderMetric('V-Model', 'models', detailPayload.models.items),
-        renderMetric('Slots', 'slots', detailPayload.slots.items)
-      ].join('')
-    )
-    .replaceAll('{{COMPONENT_NAME}}', escapeHtml(analysis.component.name))
-    .replaceAll('{{OUTPUT_TOTAL}}', String(outputTotal))
-    .replaceAll(
-      '{{OUTPUT_METRICS}}',
-      [
-        renderMetric('Emit', 'emits', detailPayload.emits.items),
-        renderMetric('Exposed', 'exposed', detailPayload.exposed.items),
-        renderMetric('Slot Props', 'slotProps', detailPayload.slotProps.items)
-      ].join('')
-    )
-    .replaceAll('{{INTERNAL_TOTAL}}', String(internalTotal))
-    .replaceAll(
-      '{{INTERNAL_METRICS}}',
-      [
-        renderMetric('Ref', 'refs', detailPayload.refs.items),
-        renderMetric('Computed', 'computed', detailPayload.computed.items),
-        renderMetric('Watch', 'watchers', detailPayload.watchers.items)
-      ].join('')
-    )
-    .replaceAll('{{PROVIDE_TOTAL}}', String(provideTotal))
-    .replaceAll('{{PROVIDE_METRICS}}', renderMetric('Provided', 'provides', detailPayload.provides.items))
-    .replaceAll('{{ANALYSIS_DETAILS}}', serializeForScript(detailPayload));
+    .replaceAll('{{ANALYSIS_DETAILS}}', serializeForScript(payload));
 }
 
 interface DetailSection {
@@ -86,83 +35,46 @@ interface DetailSection {
   items: AnalysisDetailItem[];
 }
 
-function createDetailPayload(analysis: ComponentAnalysisResult): Record<string, DetailSection> {
+interface ComplexityPayload {
+  componentName: string;
+  componentPath: string;
+  badgeAssetUri: string;
+  badgeLabel: string;
+  sections: Record<string, DetailSection>;
+}
+
+function createPayload(
+  analysis: ComponentAnalysisResult,
+  badgeAssetUri: string,
+  badgeLabel: string
+): ComplexityPayload {
   return {
-    props: {
-      title: 'Props',
-      emptyLabel: 'No props were detected.',
-      items: analysis.details.external.props
+    componentName: analysis.component.name,
+    componentPath: analysis.component.path,
+    badgeAssetUri,
+    badgeLabel,
+    sections: {
+      props: { title: 'Props', emptyLabel: 'No props were detected.', items: analysis.details.external.props },
+      models: { title: 'V-Model', emptyLabel: 'No models were detected.', items: analysis.details.external.models },
+      slots: { title: 'Slots', emptyLabel: 'No slots were detected.', items: analysis.details.external.slots },
+      injects: { title: 'Injected Dependencies', emptyLabel: 'No injected dependencies were detected.', items: analysis.details.external.injects },
+      stores: { title: 'Stores', emptyLabel: 'No stores were detected.', items: analysis.details.external.stores },
+      router: { title: 'Router', emptyLabel: 'No router composables were detected.', items: analysis.details.external.router },
+      refs: { title: 'Refs', emptyLabel: 'No refs were detected.', items: analysis.details.internal.refs },
+      computed: { title: 'Computed Values', emptyLabel: 'No computed values were detected.', items: analysis.details.internal.computed },
+      watchers: { title: 'Watchers', emptyLabel: 'No watchers were detected.', items: analysis.details.internal.watchers },
+      emits: { title: 'Emits', emptyLabel: 'No emitted events were detected.', items: analysis.details.external.emits },
+      exposed: { title: 'Exposed Members', emptyLabel: 'No exposed members were detected.', items: analysis.details.external.exposed },
+      slotProps: { title: 'Slot Props', emptyLabel: 'No slot props were detected.', items: analysis.details.external.slotProps },
+      provides: { title: 'Provided Dependencies', emptyLabel: 'No provided dependencies were detected.', items: analysis.details.external.provides },
     },
-    models: {
-      title: 'V-Model',
-      emptyLabel: 'No models were detected.',
-      items: analysis.details.external.models
-    },
-    slots: {
-      title: 'Slots',
-      emptyLabel: 'No slots were detected.',
-      items: analysis.details.external.slots
-    },
-    injects: {
-      title: 'Injected Dependencies',
-      emptyLabel: 'No injected dependencies were detected.',
-      items: analysis.details.external.injects
-    },
-    stores: {
-      title: 'Stores',
-      emptyLabel: 'No stores were detected.',
-      items: analysis.details.external.stores
-    },
-    router: {
-      title: 'Router',
-      emptyLabel: 'No router composables were detected.',
-      items: analysis.details.external.router
-    },
-    refs: {
-      title: 'Refs',
-      emptyLabel: 'No refs were detected.',
-      items: analysis.details.internal.refs
-    },
-    computed: {
-      title: 'Computed Values',
-      emptyLabel: 'No computed values were detected.',
-      items: analysis.details.internal.computed
-    },
-    watchers: {
-      title: 'Watchers',
-      emptyLabel: 'No watchers were detected.',
-      items: analysis.details.internal.watchers
-    },
-    emits: {
-      title: 'Emits',
-      emptyLabel: 'No emitted events were detected.',
-      items: analysis.details.external.emits
-    },
-    exposed: {
-      title: 'Exposed Members',
-      emptyLabel: 'No exposed members were detected.',
-      items: analysis.details.external.exposed
-    },
-    slotProps: {
-      title: 'Slot Props',
-      emptyLabel: 'No slot props were detected.',
-      items: analysis.details.external.slotProps
-    },
-    provides: {
-      title: 'Provided Dependencies',
-      emptyLabel: 'No provided dependencies were detected.',
-      items: analysis.details.external.provides
-    }
   };
 }
 
 let complexityTemplateCache: string | undefined;
 
 function getComplexityTemplate(extensionUri: vscode.Uri) {
-  if (complexityTemplateCache) {
-    return complexityTemplateCache;
-  }
-
+  if (complexityTemplateCache) return complexityTemplateCache;
   const templatePath = vscode.Uri.joinPath(extensionUri, 'media', 'webview', 'index.html');
   complexityTemplateCache = fs.readFileSync(templatePath.fsPath, 'utf8');
   return complexityTemplateCache;
@@ -171,19 +83,10 @@ function getComplexityTemplate(extensionUri: vscode.Uri) {
 function createNonce() {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let value = '';
-
   for (let index = 0; index < 32; index += 1) {
     value += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
   }
-
   return value;
-}
-
-function renderMetric(label: string, detailId: string, items: AnalysisDetailItem[]) {
-  const count = items.length;
-  const disabledAttributes = count === 0 ? ' disabled aria-disabled="true"' : '';
-
-  return `<button class="metric metric-button" type="button" data-detail-id="${escapeHtml(detailId)}"${disabledAttributes}><span class="metric-name">${escapeHtml(label)}</span><span class="metric-value">${count}</span></button>`;
 }
 
 function serializeForScript(value: unknown) {
@@ -191,15 +94,6 @@ function serializeForScript(value: unknown) {
     .replaceAll('&', '\\u0026')
     .replaceAll('<', '\\u003C')
     .replaceAll('>', '\\u003E')
-    .replaceAll('\u2028', '\\u2028')
-    .replaceAll('\u2029', '\\u2029');
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+    .replaceAll(String.fromCodePoint(0x2028), '\\u2028')
+    .replaceAll(String.fromCodePoint(0x2029), '\\u2029');
 }
