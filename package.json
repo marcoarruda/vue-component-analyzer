@@ -55,6 +55,11 @@
         }
       },
       {
+        "command": "vueComponentAnalyzer.exportGraphMock",
+        "title": "Vue Analyzer: Export Graph Mock",
+        "icon": "$(file-code)"
+      },
+      {
         "command": "vueComponentAnalyzer.showComplexity.empty",
         "title": "Vue Analyzer: Show Complexity",
         "icon": {
@@ -186,6 +191,10 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "vueComponentAnalyzer.exportGraphMock",
+          "when": "vueComponentAnalyzer.isDev"
+        },
+        {
           "command": "vueComponentAnalyzer.showComplexity.empty",
           "when": "false"
         },
@@ -251,6 +260,11 @@
         }
       ],
       "editor/title": [
+        {
+          "command": "vueComponentAnalyzer.exportGraphMock",
+          "when": "activeWebviewPanelId == 'vueComponentAnalyzer.projectGraph' && vueComponentAnalyzer.isDev",
+          "group": "navigation"
+        },
         {
           "command": "vueComponentAnalyzer.showComplexity.empty",
           "when": "resourceExtname == .vue && vueComponentAnalyzer.topbarBadge == 'analysis-empty'",

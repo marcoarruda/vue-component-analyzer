@@ -65,7 +65,7 @@ import GraphCanvas from './components/GraphCanvas.vue';
 import LegendPanel from './components/LegendPanel.vue';
 import StatsPanel from './components/StatsPanel.vue';
 import { computeVisibleGraph, collectComponentSubfolders } from './composables/useGraphFilters';
-import type { ProjectGraphResult, FilterState, ProjectGraphNode } from './types';
+import type { ProjectGraphResult, FilterState } from './types';
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : undefined;

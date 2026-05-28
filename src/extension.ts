@@ -91,6 +91,10 @@ export function activate(context: vscode.ExtensionContext) {
     await openProjectGraphPanel(context);
   };
 
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    void vscode.commands.executeCommand('setContext', 'vueComponentAnalyzer.isDev', true);
+  }
+
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
     vscode.window.registerTreeDataProvider('vueComponentAnalyzer.components', analysisTree),
@@ -101,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
           enableScripts: true,
           localResourceRoots: [context.extensionUri]
         };
-        webviewView.webview.onDidReceiveMessage((message) => handleProjectGraphWebviewMessage(context, message));
+        webviewView.webview.onDidReceiveMessage((message) => void handleProjectGraphWebviewMessage(context, message));
         void refreshProjectGraphSidebarView(context);
       }
     }),
@@ -112,6 +116,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('vueComponentAnalyzer.switchToListTreeDisplayMode', toggleTreeDisplayMode),
     vscode.commands.registerCommand('vueComponentAnalyzer.setListSortMode', pickListSortMode),
     vscode.commands.registerCommand('vueComponentAnalyzer.showProjectGraph', showProjectGraph),
+    vscode.commands.registerCommand('vueComponentAnalyzer.exportGraphMock', () => void exportGraphMock()),
     ...SHOW_COMPLEXITY_COMMAND_IDS.map((commandId) => vscode.commands.registerCommand(commandId, showComplexity)),
     vscode.workspace.onDidChangeConfiguration(async (event) => {
       if (event.affectsConfiguration('vueComponentAnalyzer.components.viewMode') || event.affectsConfiguration('vueComponentAnalyzer.components.listSortBy')) {
@@ -298,7 +303,7 @@ async function openProjectGraphPanel(context: vscode.ExtensionContext) {
     projectGraphPanel = undefined;
   });
 
-  projectGraphPanel.webview.onDidReceiveMessage((message) => handleProjectGraphWebviewMessage(context, message));
+  projectGraphPanel.webview.onDidReceiveMessage((message) => void handleProjectGraphWebviewMessage(context, message));
 
   await refreshProjectGraphPanel(context);
 }
@@ -308,22 +313,49 @@ async function handleProjectGraphWebviewMessage(context: vscode.ExtensionContext
     return;
   }
 
-  if ((message as { type: string }).type === 'openGraphPanel') {
+  const msg = message as { type: string; [key: string]: unknown };
+
+  if (msg.type === 'openGraphPanel') {
     await openProjectGraphPanel(context);
     return;
   }
 
-  if ((message as { type: string }).type !== 'openFile' || typeof (message as { path?: unknown }).path !== 'string') {
+  if (msg.type !== 'openFile' || typeof msg.path !== 'string') {
     return;
   }
 
-  const candidate = await resolveProjectGraphNodeUri((message as { path: string }).path);
+  const candidate = await resolveProjectGraphNodeUri(msg.path);
   if (!candidate) {
     return;
   }
 
   const document = await vscode.workspace.openTextDocument(candidate);
   await vscode.window.showTextDocument(document, { preview: false });
+}
+
+async function exportGraphMock() {
+  try {
+    const graph = await buildWorkspaceProjectGraph();
+    const exportName = workspaceNameToExportName(graph.workspaceName) || 'projectGraph';
+    const content =
+      `import type { ProjectGraphResult } from '../types'\n\n` +
+      `export const ${exportName}: ProjectGraphResult = ${JSON.stringify(graph, null, 2)}\n`;
+
+    const document = await vscode.workspace.openTextDocument({ content, language: 'typescript' });
+    await vscode.window.showTextDocument(document, {
+      preview: false,
+      viewColumn: vscode.ViewColumn.One,
+    });
+  } catch (err) {
+    void vscode.window.showErrorMessage(`Export Mock failed: ${String(err)}`);
+  }
+}
+
+function workspaceNameToExportName(name: string): string {
+  return name
+    .replace(/[-_](.)/g, (_, c: string) => c.toUpperCase())
+    .replace(/^(.)/, (_, c: string) => c.toLowerCase())
+    .replace(/[^a-zA-Z0-9]/g, '') || 'projectGraph';
 }
 
 async function resolveProjectGraphNodeUri(graphPath: string) {
