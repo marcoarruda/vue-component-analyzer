@@ -1,7 +1,7 @@
 import type { ProjectGraphNode, ProjectGraphEdge, NodePosition } from '../types';
 
 // Minimum gap between circle edges of sibling nodes
-const MIN_NODE_GAP = 52;
+const MIN_NODE_GAP = 80;
 // Extra gap inserted between separate root subtrees
 const ROOT_EXTRA_GAP = 72;
 // Vertical distance between levels

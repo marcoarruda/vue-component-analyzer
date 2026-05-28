@@ -90,6 +90,49 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+const LABEL_MAX_CHARS = 14;
+const LABEL_LINE_HEIGHT = 14;
+
+function findBreakPoints(text: string): number[] {
+  const points: number[] = [];
+  for (let i = 1; i < text.length; i++) {
+    const prev = text[i - 1];
+    const curr = text[i];
+    if (prev === '/' || prev === '_' || prev === '-') {
+      points.push(i);
+    } else if (curr === '.') {
+      points.push(i);
+    } else if (/[a-z]/.test(prev) && /[A-Z]/.test(curr)) {
+      points.push(i);
+    }
+  }
+  return points;
+}
+
+function wrapLabelText(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+
+  const breakPoints = findBreakPoints(text);
+  const naturalBreak = [...breakPoints].reverse().find((p) => p <= maxChars && p > 0);
+  if (naturalBreak !== undefined) {
+    return [text.slice(0, naturalBreak), ...wrapLabelText(text.slice(naturalBreak), maxChars)];
+  }
+
+  const nextBreak = breakPoints.find((p) => p > maxChars);
+  if (nextBreak !== undefined) {
+    return [text.slice(0, nextBreak), ...wrapLabelText(text.slice(nextBreak), maxChars)];
+  }
+
+  return [text.slice(0, maxChars), ...wrapLabelText(text.slice(maxChars), maxChars)];
+}
+
+function buildLabelInnerHtml(text: string, centerX: number, maxChars: number = LABEL_MAX_CHARS): string {
+  const lines = wrapLabelText(text, maxChars);
+  return lines.map((line, i) =>
+    `<tspan x="${centerX.toFixed(2)}" dy="${i === 0 ? 0 : LABEL_LINE_HEIGHT}">${escapeHtml(line)}</tspan>`
+  ).join('');
+}
+
 function renderEdges(edges: ProjectGraphEdge[], positions: Map<string, NodePosition>): string {
   return edges.map((edge) => {
     const source = positions.get(edge.source);
@@ -116,7 +159,8 @@ function renderNodes(
     const displayLabel = showFolderPaths ? shortPath : node.label;
     const labelHidden = !showLabels && !showFolderPaths;
     const labelClassName = labelHidden ? 'graph-label is-hidden' : 'graph-label';
-    const label = `<text class="${labelClassName}" x="${position.x.toFixed(2)}" y="${(position.y + radius + 16).toFixed(2)}">${escapeHtml(displayLabel)}</text>`;
+    const labelContent = buildLabelInnerHtml(displayLabel, position.x);
+    const label = `<text class="${labelClassName}" x="${position.x.toFixed(2)}" y="${(position.y + radius + 16).toFixed(2)}">${labelContent}</text>`;
 
     return `<g class="graph-node graph-node--${node.color}${node.virtual ? ' graph-node--virtual' : ''}" `
       + `data-node-id="${escapeHtml(node.id)}" `
@@ -207,7 +251,9 @@ function applyHoveredNodeState() {
       const nodeLabel = nodeEl.getAttribute('data-node-label') ?? '';
       const defaultLabel = showFolderPaths ? (shortPath || nodeLabel) : nodeLabel;
       const fullPath = nodeEl.getAttribute('data-node-path') ?? defaultLabel;
-      labelEl.textContent = shouldShowPath ? fullPath : defaultLabel;
+      const text = shouldShowPath ? fullPath : defaultLabel;
+      const cx = parseFloat((labelEl as SVGTextElement).getAttribute('x') ?? '0');
+      labelEl.innerHTML = buildLabelInnerHtml(text, cx, shouldShowPath ? 20 : LABEL_MAX_CHARS);
       labelEl.classList.toggle('graph-label--path', shouldShowPath);
       labelEl.classList.toggle('is-hidden', !showLabels && !showFolderPaths && !shouldShowPath);
     }
