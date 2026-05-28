@@ -108,24 +108,5 @@ const graph004 = computed(() => computeVisibleGraph(case004.nodes, case004.edges
         <HstCheckbox v-model="filters.showFolderPaths" title="Show Folder Paths" />
       </template>
     </Variant>
-
-    <Variant title="Study Case 005 — Cerebrum UI">
-      <GraphCanvas :visible-nodes="graph005.visibleNodes" :visible-edges="graph005.visibleEdges"
-        :connected-edges-by-node-id="graph005.connectedEdgesByNodeId" :all-edges="case005.edges"
-        :selected-node-id="null" :filters="filters" />
-      <template #controls>
-        <HstCheckbox v-model="filters.hideIsolated" title="Hide Isolated" />
-        <HstCheckbox v-model="filters.showTests" title="Show Tests" />
-        <HstCheckbox v-model="filters.showStories" title="Show Stories" />
-        <HstCheckbox v-model="filters.showAppEntries" title="Show App Entries" />
-        <HstCheckbox v-model="filters.showRouter" title="Show Router" />
-        <HstCheckbox v-model="filters.showServices" title="Show Services" />
-        <HstCheckbox v-model="filters.showStores" title="Show Stores" />
-        <HstCheckbox v-model="filters.showComposableTs" title="Show Composables" />
-        <HstCheckbox v-model="filters.showViewComponents" title="Show View Components" />
-        <HstCheckbox v-model="filters.showLabels" title="Show Labels" />
-        <HstCheckbox v-model="filters.showFolderPaths" title="Show Folder Paths" />
-      </template>
-    </Variant>
   </Story>
 </template>
