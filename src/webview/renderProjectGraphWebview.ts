@@ -22,7 +22,7 @@ export function renderProjectGraphWebview(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
   graph: ProjectGraphResult,
-  layout: 'panel' | 'sidebar' = 'panel'
+  layout: 'panel' | 'sidebar' = 'panel',
 ) {
   const template = getProjectGraphTemplate();
   const scriptNonce = createNonce();
