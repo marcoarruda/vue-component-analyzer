@@ -9,7 +9,6 @@ import { website as case001 } from './mocks/case-001'
 import { WebAppUI as case002 } from './mocks/case-002'
 import { website as case003 } from './mocks/case-003'
 import { vueconfWorkshop2026 as case004 } from './mocks/case-004'
-import { cerebrumUi as case005 } from './mocks/case-005'
 
 const filters = ref<FilterState>({
   hideIsolated: false,
@@ -30,7 +29,6 @@ const graph001 = computed(() => computeVisibleGraph(case001.nodes, case001.edges
 const graph002 = computed(() => computeVisibleGraph(case002.nodes, case002.edges, filters.value, null))
 const graph003 = computed(() => computeVisibleGraph(case003.nodes, case003.edges, filters.value, null))
 const graph004 = computed(() => computeVisibleGraph(case004.nodes, case004.edges, filters.value, null))
-const graph005 = computed(() => computeVisibleGraph(case005.nodes, case005.edges, filters.value, null))
 </script>
 
 <template>
